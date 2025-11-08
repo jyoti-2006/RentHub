@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Vehicle - RentHub</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+
+        .booking-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .booking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .booking-header h1 {
+            margin: 0;
+            color: #333;
+            font-size: 1.8rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #666;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .vehicle-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 2rem;
+        }
+
+        .vehicle-info h2 {
+            margin: 0 0 1rem 0;
+            color: #333;
+        }
+
+        .vehicle-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .vehicle-details p {
+            margin: 0;
+            color: #555;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .price-details {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1.5rem 0;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-row.total {
+            font-weight: bold;
+            border-top: 1px solid #ddd;
+            padding-top: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .payment-info {
+            background: #e3f2fd;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1.5rem 0;
+            border-left: 4px solid #2196f3;
+        }
+
+        .payment-info p {
+            margin: 0;
+            color: #0d47a1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: #0056b3;
+        }
+
+        /* Modern Terms and Conditions Styling */
+        .terms-wrapper {
+            background: #ffffff;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .terms-wrapper:hover {
+            border-color: #007bff;
+            box-shadow: 0 4px 12px rgba(0,123,255,0.1);
+        }
+        
+        .terms-agreement {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .checkbox-wrapper {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 20px;
+            width: 20px;
+            margin: 0;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #374151;
+            user-select: none;
+            position: relative;
+        }
+        
+        .checkmark {
+            position: relative;
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+            display: block;
+        }
+        
+        .checkmark::after {
+            content: "";
+            position: absolute;
+            left: 6px;
+            top: 2px;
+            width: 6px;
+            height: 10px;
+            border: solid #ffffff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"]:checked + .checkbox-label .checkmark {
+            background: #007bff;
+            border-color: #007bff;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"]:checked + .checkbox-label .checkmark::after {
+            opacity: 1;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"]:focus + .checkbox-label .checkmark {
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        
+        .checkbox-wrapper input[type="checkbox"]:hover + .checkbox-label .checkmark {
+            border-color: #007bff;
+        }
+        
+        .label-text {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .terms-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 600;
+            border-bottom: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .terms-link:hover {
+            color: #0056b3;
+            border-bottom-color: #0056b3;
+        }
+        
+        .required {
+            color: #dc2626;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+        
+        .terms-note {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+        
+        .terms-note i {
+            color: #3b82f6;
+            font-size: 14px;
+        }
+        
+        /* Ensure checkbox is properly styled */
+        .checkbox-wrapper {
+            position: relative;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 1;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #374151;
+            user-select: none;
+            position: relative;
+            padding-left: 0;
+        }
+        
+        .checkmark {
+            position: relative;
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+            display: inline-block;
+            vertical-align: top;
+        }
+        
+        /* Custom checkmark animation */
+        .checkbox-wrapper input[type="checkbox"]:checked + .checkbox-label .checkmark {
+            background: #007bff;
+            border-color: #007bff;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"]:checked + .checkbox-label .checkmark::after {
+            opacity: 1;
+        }
+        
+        /* Hover effects */
+        .checkbox-wrapper:hover .checkmark {
+            border-color: #007bff;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"]:focus + .checkbox-label .checkmark {
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+            outline: none;
+        }
+        
+        /* Modern Checkbox Design */
+        .modern-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #374151;
+            user-select: none;
+            position: relative;
+        }
+        
+        .modern-checkbox input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+        
+        .checkmark-custom {
+            position: relative;
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+            display: inline-block;
+        }
+        
+        .checkmark-custom::after {
+            content: "";
+            position: absolute;
+            left: 6px;
+            top: 2px;
+            width: 6px;
+            height: 10px;
+            border: solid #ffffff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .modern-checkbox input[type="checkbox"]:checked ~ .checkmark-custom {
+            background: #007bff;
+            border-color: #007bff;
+        }
+        
+        .modern-checkbox input[type="checkbox"]:checked ~ .checkmark-custom::after {
+            opacity: 1;
+        }
+        
+        .modern-checkbox:hover .checkmark-custom {
+            border-color: #007bff;
+        }
+        
+        .modern-checkbox input[type="checkbox"]:focus ~ .checkmark-custom {
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        
+        .checkbox-text {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        /* Modern Terms Modal Styling */
+        .terms-modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+            backdrop-filter: blur(4px);
+        }
+        
+        .terms-modal-content {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            max-width: 800px;
+            max-height: 90vh;
+            margin: 1rem;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .terms-modal-header {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .modal-title-section {
+            flex: 1;
+        }
+        
+        .terms-modal-title {
+            margin: 0 0 8px 0;
+            color: #111827;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        
+        .modal-subtitle {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        .terms-modal-close {
+            background: #f3f4f6;
+            border: none;
+            color: #6b7280;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .terms-modal-close:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        
+        .terms-modal-body {
+            padding: 32px;
+            max-height: 60vh;
+            overflow-y: auto;
+            background: #ffffff;
+        }
+        
+        .terms-section {
+            margin-bottom: 24px;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        
+        .terms-section-blue {
+            border-left: 4px solid #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .terms-section-green {
+            border-left: 4px solid #10b981;
+            background: #ecfdf5;
+        }
+        
+        .terms-section-yellow {
+            border-left: 4px solid #f59e0b;
+            background: #fffbeb;
+        }
+        
+        .terms-section-cyan {
+            border-left: 4px solid #06b6d4;
+            background: #ecfeff;
+        }
+        
+        .terms-section-red {
+            border-left: 4px solid #ef4444;
+            background: #fef2f2;
+        }
+        
+        .terms-section-orange {
+            border-left: 4px solid #f97316;
+            background: #fff7ed;
+        }
+        
+        .terms-section-gray {
+            border-left: 4px solid #6b7280;
+            background: #f9fafb;
+        }
+        
+        .terms-section-title {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+        }
+        
+        .terms-section-blue .terms-section-title {
+            color: #1e40af;
+        }
+        
+        .terms-section-green .terms-section-title {
+            color: #047857;
+        }
+        
+        .terms-section-yellow .terms-section-title {
+            color: #92400e;
+        }
+        
+        .terms-section-cyan .terms-section-title {
+            color: #0e7490;
+        }
+        
+        .terms-section-red .terms-section-title {
+            color: #b91c1c;
+        }
+        
+        .terms-section-orange .terms-section-title {
+            color: #c2410c;
+        }
+        
+        .terms-section-gray .terms-section-title {
+            color: #374151;
+        }
+        
+        .terms-section-list {
+            margin: 0;
+            padding-left: 20px;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+        
+        .terms-section-list li {
+            margin-bottom: 8px;
+        }
+        
+        .terms-modal-footer {
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .terms-modal-notice {
+            color: #6b7280;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .terms-btn {
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 120px;
+        }
+        
+        .terms-btn-accept {
+            background: #10b981;
+            color: white;
+            margin-right: 12px;
+        }
+        
+        .terms-btn-accept:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .terms-btn-decline {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .terms-btn-decline:hover {
+            background: #4b5563;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+        }
+        
+        .terms-modal-footer .terms-btn {
+            display: inline-flex;
+            margin: 0 6px;
+        }
+
+        /* Enhanced button hover effects */
+        #acceptTermsBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4) !important;
+        }
+        
+        #declineTermsBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(108, 117, 125, 0.4) !important;
+        }
+        
+        #closeTermsModal:hover {
+            background: rgba(255,255,255,0.3) !important;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .booking-container {
+                padding: 1rem;
+            }
+
+            .vehicle-details {
+                grid-template-columns: 1fr;
+            }
+            
+            #terms-modal > div {
+                margin: 0.5rem !important;
+                max-width: 95vw !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h1>RentHub</h1>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="about.html">About</a>
+            <a href="contact.html">Contact</a>
+            <a href="my-bookings.html" id="myBookingsBtn">My Bookings</a>
+        </div>
+        <div class="auth-buttons">
+            <a href="login.html" class="btn btn-login">Login</a>
+            <button id="registerBtn" class="btn btn-primary">Register</button>
+            <button id="adminBtn" class="btn btn-secondary" style="display: none;">Admin Panel</button>
+            <button id="logoutBtn" class="btn" style="display: none;">Logout</button>
+        </div>
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+    
+    <main class="booking-page-main">
+        <div class="booking-container">
+            <div class="booking-header">
+                <h1>Book Vehicle</h1>
+                <button class="close-btn" onclick="window.close()">&times;</button>
+            </div>
+
+            <div class="vehicle-info">
+                <h2>Vehicle Details</h2>
+                <div class="vehicle-details">
+                    <p><strong>Name:</strong> <span id="vehicleName">Loading...</span></p>
+                    <p><strong>Engine:</strong> <span id="vehicleEngine">Loading...</span></p>
+                    <p><strong>Fuel Type:</strong> <span id="vehicleFuel">Loading...</span></p>
+                    <p><strong>Price per day:</strong> <span id="vehiclePrice">Loading...</span></p>
+                </div>
+            </div>
+
+            <form id="bookingForm">
+                <input type="hidden" id="vehicleId" name="vehicleId">
+                <input type="hidden" id="vehicleType" name="vehicleType">
+
+                <div class="form-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate" name="startDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="startTime">Start Time</label>
+                    <input type="time" id="startTime" name="startTime" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="duration">Duration (hours)</label>
+                    <input type="number" id="duration" name="duration" min="2" max="24" value="2" required>
+                </div>
+
+                <div class="price-details">
+                    <div class="price-row">
+                        <span>Duration:</span>
+                        <span><span id="totalHours">1</span> hours</span>
+                    </div>
+                    <div class="price-row">
+                        <span>Total Amount:</span>
+                        <span id="totalAmount">₹0</span>
+                    </div>
+                    <div class="price-row">
+                        <span>Advance Payment:</span>
+                        <span>₹100</span>
+                    </div>
+                    <div class="price-row total">
+                        <span>Remaining Amount:</span>
+                        <span id="remainingAmount">₹0</span>
+                    </div>
+                </div>
+
+                <!-- Payment Options Section -->
+                <div class="form-group">
+                    <h2 style="color:#1976d2; text-align:center; margin-bottom:1rem;">
+                        <span style="font-size:1.2em;">💰</span> Payment Options - Advance Amount: <span style="color:#009688;">₹100</span>
+                    </h2>
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; justify-content:center;">
+                        <div style="flex:1 1 200px; min-width:200px; background:#f5fff5; border-radius:8px; padding:16px; border:1px solid #b2dfdb; text-align:center;">
+                            <h3 style="color:#388e3c; margin-bottom:8px;">QR Code Payment</h3>
+                            <img src="photo/QR.jpeg" alt="QR Code" style="max-width:120px; margin:8px auto; display:block; border:1px solid #ccc; border-radius:8px;">
+                            <div style="color:#388e3c; font-weight:500; margin-top:8px;">Quick & Easy Payment</div>
+                        </div>
+                        <div style="flex:1 1 200px; min-width:200px; background:#fff8f5; border-radius:8px; padding:16px; border:1px solid #ffcdd2; text-align:center;">
+                            <h3 style="color:#d84315; margin-bottom:8px;">UPI Payment</h3>
+                            <div style="font-size:1.1em; color:#d84315; background:#fff3e0; padding:8px 0; border-radius:4px; font-weight:600;">UPI ID: <span id="upiId">90407576830@ibl</span></div>
+                            <div style="color:#d84315; font-weight:500; margin-top:8px;">Instant Transfer</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; background:#f3f7fa; border-radius:8px; padding:16px; border:1px solid #90caf9;">
+                        <h3 style="color:#1565c0; margin-bottom:8px; text-align:center;">🏦 Bank Transfer</h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                            <div><strong>Account Holder:</strong> Kaushik Das</div>
+                            <div><strong>Account Number:</strong> 5350101111111384</div>
+                            <div><strong>IFSC Code:</strong> SBIN50004500</div>
+                            <div><strong>Bank:</strong> State Bank of India</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:16px; text-align:center; color:#1976d2; font-size:1em;">
+                        <b>Choose any payment method above. After payment, click 'Confirm Booking' below.</b>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="transactionId">Transaction ID</label>
+                    <input type="text" id="transactionId" name="transactionId" placeholder="Enter UPI transaction ID" required>
+                </div>
+
+                <!-- Terms and Conditions Section -->
+                <div class="form-group">
+                    <div class="terms-wrapper">
+                        <div class="terms-agreement">
+                            <label class="modern-checkbox">
+                                <input type="checkbox" id="termsCheckbox" name="termsCheckbox" required>
+                                <span class="checkmark-custom"></span>
+                                <span class="checkbox-text">
+                                    I have read and agree to the 
+                                    <a href="#" id="termsLink" class="terms-link">Terms and Conditions</a>
+                                    <span class="required">*</span>
+                                </span>
+                            </label>
+                            <div class="terms-note">
+                                <i class="fas fa-info-circle"></i>
+                                By proceeding, you acknowledge that you have read, understood, and agree to be bound by our terms and conditions.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="confirmBookingBtn" disabled>Confirm Booking</button>
+            </form>
+        </div>
+    </main>
+
+    <div id="register-choice-modal" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); justify-content:center; align-items:center;">
+        <div style="background:#fff; padding:32px 24px; border-radius:10px; box-shadow:0 4px 24px rgba(0,0,0,0.12); min-width:300px; text-align:center;">
+            <h3 style="margin-bottom:20px;">Register as</h3>
+            <button id="registerAsUserBtn" class="btn btn-primary" style="margin:8px 0; width:90%;">User</button><br>
+            <button id="registerAsAdminBtn" class="btn btn-secondary" style="margin:8px 0; width:90%;">Admin</button><br>
+            <button id="closeRegisterChoiceModal" class="btn" style="margin-top:16px; background:#eee; color:#333;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Terms and Conditions Modal -->
+    <div id="terms-modal" class="terms-modal">
+        <div class="terms-modal-content">
+            <div class="terms-modal-header">
+                <div class="modal-title-section">
+                    <h2 class="terms-modal-title">Terms and Conditions</h2>
+                    <p class="modal-subtitle">Please read these terms carefully before proceeding with your booking</p>
+                </div>
+                <button id="closeTermsModal" class="terms-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="terms-modal-body">
+                <div class="terms-section terms-section-blue">
+                    <h3 class="terms-section-title">1. 📋 Booking Confirmation</h3>
+                    <ul class="terms-section-list">
+                        <li>Advance booking is confirmed only after successful payment of the advance amount.</li>
+                        <li>A confirmation message/email will be sent once the booking is verified.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-green">
+                    <h3 class="terms-section-title">2. 💰 Advance Payment</h3>
+                    <ul class="terms-section-list">
+                        <li>A minimum of ₹100/- of the total rental amount must be paid in advance to secure your booking.</li>
+                        <li>The remaining amount must be paid at the time of bike pickup.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-yellow">
+                    <h3 class="terms-section-title">3. ⏰ Cancellation Policy</h3>
+                    <ul class="terms-section-list">
+                        <li>Cancellation 2 hours before the booking time → Full refund of advance.</li>
+                        <li>Cancellation within 2 hours of after booking time → 50% of the advance will be deducted.</li>
+                        <li>No show without cancellation → No refund.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-cyan">
+                    <h3 class="terms-section-title">4. 📄 Required Documents</h3>
+                    <ul class="terms-section-list">
+                        <li>Valid Aadhar Card proof must be shown at the time of pickup.</li>
+                        <li>The booking will be cancelled if valid documents are not presented.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-red">
+                    <h3 class="terms-section-title">5. 🚲 Bike Usage</h3>
+                    <ul class="terms-section-list">
+                        <li>The bike should be used only by the registered renter.</li>
+                        <li>Sub-renting or transfer of booking is strictly prohibited.</li>
+                        <li>Any damage or traffic violation fines during the rental period are the renter's responsibility.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-orange">
+                    <h3 class="terms-section-title">6. ⏱️ Late Return</h3>
+                    <ul class="terms-section-list">
+                        <li>Delay beyond the scheduled return time will incur late fees per hour.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-green">
+                    <h3 class="terms-section-title">7. 💳 Refund Policy</h3>
+                    <ul class="terms-section-list">
+                        <li>Refunds (if applicable) will be processed within 3–5 working days after cancellation.</li>
+                    </ul>
+                </div>
+
+                <div class="terms-section terms-section-gray">
+                    <h3 class="terms-section-title">8. 🏢 Company Rights</h3>
+                    <ul class="terms-section-list">
+                        <li>The company reserves the right to cancel any booking due to unforeseen issues (bike unavailability, technical problems, or policy violations).</li>
+                        <li>In such cases, a full refund of the advance will be provided.</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="terms-modal-footer">
+                <div class="terms-modal-notice">
+                    Please read all terms carefully before accepting
+                </div>
+                <div style="text-align: center;">
+                    <button id="acceptTermsBtn" class="terms-btn terms-btn-accept">
+                        Accept Terms
+                    </button>
+                    <button id="declineTermsBtn" class="terms-btn terms-btn-decline">
+                        Decline
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>RentHub</h3>
+                <p>Your trusted partner for bike rentals</p>
+            </div>
+            <div class="footer-section">
+                <h3>Quick Links</h3>
+                <a href="index.html">Home</a>
+                <a href="about.html">About</a>
+                <a href="contact.html">Contact</a>
+            </div>
+            <div class="footer-section">
+                <h3>Contact Us</h3>
+                <p>Email: info@bikerental.com</p>
+                <p>Phone: 7077733320</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 RentHub. All rights reserved.</p>
+            <p><a href="login.html" class="admin-login-link">Admin Login</a></p>
+        </div>
+    </footer>
+    
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/welcome-message.js"></script>
+
+    <script>
+    // Register choice modal logic
+    const registerBtn = document.getElementById('registerBtn');
+    const registerChoiceModal = document.getElementById('register-choice-modal');
+    const registerAsUserBtn = document.getElementById('registerAsUserBtn');
+    const registerAsAdminBtn = document.getElementById('registerAsAdminBtn');
+    const closeRegisterChoiceModal = document.getElementById('closeRegisterChoiceModal');
+
+    if (registerBtn && registerChoiceModal) {
+        registerBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            registerChoiceModal.style.display = 'flex';
+        });
+    }
+    if (registerAsUserBtn) {
+        registerAsUserBtn.addEventListener('click', () => {
+            window.location.href = 'user-register.html';
+        });
+    }
+    if (registerAsAdminBtn) {
+        registerAsAdminBtn.addEventListener('click', () => {
+            window.location.href = 'admin-register.html';
+        });
+    }
+    if (closeRegisterChoiceModal) {
+        closeRegisterChoiceModal.addEventListener('click', () => {
+            registerChoiceModal.style.display = 'none';
+        });
+    }
+    window.addEventListener('click', (e) => {
+        if (e.target === registerChoiceModal) {
+            registerChoiceModal.style.display = 'none';
+        }
+    });
+
+    // Terms and Conditions functionality
+    const termsLink = document.getElementById('termsLink');
+    const termsModal = document.getElementById('terms-modal');
+    const closeTermsModal = document.getElementById('closeTermsModal');
+    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
+    const declineTermsBtn = document.getElementById('declineTermsBtn');
+    const termsCheckbox = document.getElementById('termsCheckbox');
+    const confirmBookingBtn = document.getElementById('confirmBookingBtn');
+
+    // Open terms modal
+    if (termsLink) {
+        termsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            termsModal.style.display = 'flex';
+        });
+    }
+
+    // Close terms modal
+    if (closeTermsModal) {
+        closeTermsModal.addEventListener('click', () => {
+            termsModal.style.display = 'none';
+        });
+    }
+
+    // Accept terms
+    if (acceptTermsBtn) {
+        acceptTermsBtn.addEventListener('click', () => {
+            termsCheckbox.checked = true;
+            termsModal.style.display = 'none';
+            updateConfirmButtonState();
+        });
+    }
+
+    // Decline terms
+    if (declineTermsBtn) {
+        declineTermsBtn.addEventListener('click', () => {
+            termsCheckbox.checked = false;
+            termsModal.style.display = 'none';
+            updateConfirmButtonState();
+        });
+    }
+
+    // Handle checkbox change
+    if (termsCheckbox) {
+        termsCheckbox.addEventListener('change', updateConfirmButtonState);
+    }
+
+    // Update confirm button state based on terms acceptance
+    function updateConfirmButtonState() {
+        if (termsCheckbox && confirmBookingBtn) {
+            if (termsCheckbox.checked) {
+                confirmBookingBtn.disabled = false;
+                confirmBookingBtn.style.background = '#007bff';
+                confirmBookingBtn.style.cursor = 'pointer';
+            } else {
+                confirmBookingBtn.disabled = true;
+                confirmBookingBtn.style.background = '#6c757d';
+                confirmBookingBtn.style.cursor = 'not-allowed';
+            }
+        }
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === termsModal) {
+            termsModal.style.display = 'none';
+        }
+    });
+
+    // Initialize button state
+    updateConfirmButtonState();
+    </script>
+</body>
+</html> 
