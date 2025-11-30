@@ -103,6 +103,35 @@ async function sendPasswordResetOTP(userEmail, userName, otp) {
     }
 }
 
+// Send registration OTP email
+async function sendRegistrationOTP(userEmail, userName, otp) {
+    try {
+        const mailOptions = {
+            from: '"RentHub Verification" <' + transporterConfig.auth.user + '>',
+            to: userEmail,
+            subject: 'Verify your email — RentHub registration',
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                  <h2>Hello${userName ? ', ' + userName : ''}!</h2>
+                  <p>Thanks for signing up for RentHub. Please use the following OTP to verify your email address and complete registration.</p>
+                  <p><b>Your verification code is:</b> <span style="font-size: 1.5em; color: #1976d2;">${otp}</span></p>
+                  <p>This code will expire in 10 minutes.</p>
+                  <p>If you did not try to register, you can ignore this email.</p>
+                  <br>
+                  <p>Good luck!<br>The RentHub Team</p>
+                </div>
+            `
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        console.log('Registration OTP email sent successfully:', result.messageId);
+        return { success: true, messageId: result.messageId };
+    } catch (error) {
+        console.error('Error sending registration OTP email:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // Send refund completion email
 async function sendRefundCompleteEmail(userEmail, userName, bookingId, amount, refundTime, refundDetails) {
     try {
@@ -149,5 +178,6 @@ module.exports = {
     generateOTP,
     sendBookingConfirmationEmail,
     sendPasswordResetOTP,
+    sendRegistrationOTP,
     sendRefundCompleteEmail
 }; 

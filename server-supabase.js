@@ -8,7 +8,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const SupabaseDB = require('./models/supabaseDB');
 const supabase = require('./config/supabase');
-const { sendBookingConfirmationEmail, sendPasswordResetOTP, generateOTP } = require('./config/emailService');
+const { sendBookingConfirmationEmail, sendPasswordResetOTP, sendRegistrationOTP, generateOTP } = require('./config/emailService');
 const { makeBookingConfirmationCall } = require('./config/retellCallService');
 
 const app = express();
@@ -830,14 +830,74 @@ async function checkTimeConflict(vehicleId, startDate, startTime, duration) {
 }
 
 // User Registration
+// Send registration OTP - call this when the user/admin enters email and requests verification
+app.post('/api/register/send-otp', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        // If user already exists, don't send OTP
+        const existingUser = await SupabaseDB.getUserByEmail(email);
+        if (existingUser) return res.status(400).json({ error: 'Email already registered' });
+
+        // Generate OTP
+        const otp = generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+        // Remove any previous OTPs for this email and insert the new OTP
+        await supabase.from('password_reset_otps').delete().eq('email', email);
+        const { error: otpError } = await supabase.from('password_reset_otps').insert({
+            user_id: null,
+            email: email,
+            otp: otp,
+            expires_at: otpExpiry,
+            created_at: new Date().toISOString()
+        });
+
+        if (otpError) {
+            console.error('Error storing registration OTP:', otpError);
+            return res.status(500).json({ error: 'Error generating OTP' });
+        }
+
+        // Send OTP email
+        const emailResult = await sendRegistrationOTP(email, '', otp);
+        if (!emailResult.success) {
+            console.error('Failed to send registration OTP:', emailResult.error);
+            return res.status(500).json({ error: 'Failed to send OTP email' });
+        }
+
+        res.json({ message: 'OTP sent successfully to your email' });
+    } catch (error) {
+        console.error('Error in /api/register/send-otp:', error);
+        res.status(500).json({ error: 'Error sending OTP' });
+    }
+});
+
 app.post('/api/register/user', async (req, res) => {
     try {
-        const { fullName, email, phoneNumber, password } = req.body;
+        const { fullName, email, phoneNumber, password, otp } = req.body;
         
         // Check if user exists
         const existingUser = await SupabaseDB.getUserByEmail(email);
         if (existingUser) {
             return res.status(400).json({ error: 'Email already exists' });
+        }
+
+        // Verify OTP exists and not expired
+        if (!otp) {
+            return res.status(400).json({ error: 'OTP required to complete registration' });
+        }
+
+        const { data: otpRecord, error: otpError } = await supabase
+            .from('password_reset_otps')
+            .select('*')
+            .eq('email', email)
+            .eq('otp', otp)
+            .gte('expires_at', new Date().toISOString())
+            .single();
+
+        if (otpError || !otpRecord) {
+            return res.status(400).json({ error: 'Invalid or expired OTP' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -849,7 +909,10 @@ app.post('/api/register/user', async (req, res) => {
             is_admin: false
         };
 
-        await SupabaseDB.createUser(newUser);
+        const created = await SupabaseDB.createUser(newUser);
+
+        // Delete used OTP record
+        await supabase.from('password_reset_otps').delete().eq('id', otpRecord.id);
         res.status(201).json({ message: 'User registered successfully' });
     } catch (error) {
         console.error('Error registering user:', error);
@@ -860,7 +923,7 @@ app.post('/api/register/user', async (req, res) => {
 // Admin Registration
 app.post('/api/register/admin', async (req, res) => {
     try {
-        const { adminName, email, adminId, password, securityCode } = req.body;
+        const { adminName, email, adminId, password, securityCode, otp } = req.body;
 
         if (securityCode !== '1575') {
             return res.status(403).json({ error: 'Invalid Security Code. You are not authorized to register as admin.' });
@@ -869,6 +932,23 @@ app.post('/api/register/admin', async (req, res) => {
         const existingUser = await SupabaseDB.getUserByEmail(email);
         if (existingUser) {
             return res.status(400).json({ error: 'Email already exists' });
+        }
+
+        // Verify OTP exists and not expired
+        if (!otp) {
+            return res.status(400).json({ error: 'OTP required to complete registration' });
+        }
+
+        const { data: otpRecord, error: otpError } = await supabase
+            .from('password_reset_otps')
+            .select('*')
+            .eq('email', email)
+            .eq('otp', otp)
+            .gte('expires_at', new Date().toISOString())
+            .single();
+
+        if (otpError || !otpRecord) {
+            return res.status(400).json({ error: 'Invalid or expired OTP' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -880,7 +960,10 @@ app.post('/api/register/admin', async (req, res) => {
             is_admin: true
         };
 
-        await SupabaseDB.createUser(newAdmin);
+        const created = await SupabaseDB.createUser(newAdmin);
+
+        // Delete used OTP record
+        await supabase.from('password_reset_otps').delete().eq('id', otpRecord.id);
         res.status(201).json({ message: 'Admin registered successfully' });
     } catch (error) {
         console.error('Error registering admin:', error);
