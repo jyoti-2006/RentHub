@@ -1683,6 +1683,37 @@ app.get('/test-email', async (req, res) => {
     }
 });
 
+// Debug endpoint to help check Supabase connectivity in deployed environments
+// Safe: doesn't leak keys, only reports whether keys are set and attempts a small select
+app.get('/debug/supabase', async (req, res) => {
+    const supabaseUrl = process.env.SUPABASE_URL || null;
+    const anonSet = !!process.env.SUPABASE_ANON_KEY;
+    const serviceRoleSet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    try {
+        // Try a simple small select to verify connectivity (table 'bikes' is expected in this app)
+        const { data, error } = await supabase.from('bikes').select('id').limit(1);
+        if (error) throw error;
+
+        return res.json({
+            success: true,
+            supabaseUrl: supabaseUrl ? 'Set' : 'Not set',
+            anonKey: anonSet ? 'Set' : 'Not set',
+            serviceRoleKey: serviceRoleSet ? 'Set' : 'Not set',
+            sample: data || []
+        });
+    } catch (err) {
+        // Provide helpful diagnostic info without returning secret values
+        return res.status(500).json({
+            success: false,
+            supabaseUrl: supabaseUrl ? 'Set' : 'Not set',
+            anonKey: anonSet ? 'Set' : 'Not set',
+            serviceRoleKey: serviceRoleSet ? 'Set' : 'Not set',
+            error: err.message
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Email test endpoint: http://localhost:${PORT}/test-email`);
