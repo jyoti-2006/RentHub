@@ -229,6 +229,24 @@ body {
     color: var(--white);
 }
 
+/* Verify Email button style (used for small inline verification buttons) */
+.btn-verify {
+    background-color: #1976d2; /* blue */
+    color: var(--white);
+    padding: 0.6rem 0.9rem;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 2px 8px rgba(25,118,210,0.15);
+}
+.btn-verify:hover {
+    background-color: #125b9b; /* darker blue */
+}
+.btn-verify:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Links within auth forms */
 .auth-form p {
     text-align: center;
