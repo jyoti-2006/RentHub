@@ -1010,8 +1010,8 @@ app.post('/api/login/admin', async (req, res) => {
 
 // Get all vehicles
 app.get('/api/vehicles/:type', async (req, res) => {
+    const { type } = req.params;
     try {
-        const { type } = req.params;
         const vehicles = await SupabaseDB.getVehicles(type);
         res.json(vehicles);
     } catch (error) {
