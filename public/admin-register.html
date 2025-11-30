@@ -122,6 +122,18 @@
                         <input type="password" id="adminPassword" placeholder="Password" required>
                         <i class="fas fa-eye toggle-password" onclick="togglePassword('adminPassword')"></i>
                     </div>
+                    <div id="adminPasswordRules" style="margin-top:8px;font-size:0.9rem;color:#555">
+                        <strong>Password must include:</strong>
+                        <ul id="adminPasswordRulesList" style="margin:6px 0 0 18px">
+                            <li id="admin-rule-length">At least 8 characters</li>
+                            <li id="admin-rule-upper">At least one uppercase letter (A-Z)</li>
+                            <li id="admin-rule-lower">At least one lowercase letter (a-z)</li>
+                            <li id="admin-rule-digit">At least one digit (0-9)</li>
+                            <li id="admin-rule-special">At least one special character (! @ # $ % ^ & * _ - ?)</li>
+                            <li id="admin-rule-no-space">Cannot contain spaces</li>
+                            <li id="admin-rule-not-common">Must not be a common/weak password</li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="confirmAdminPassword">Confirm Password</label>
@@ -189,6 +201,31 @@
                 adminSendOtpBtn.textContent = 'Verify Email';
             });
             const form = document.getElementById('adminRegisterForm');
+            const adminPassword = document.getElementById('adminPassword');
+            const adminConfirm = document.getElementById('confirmAdminPassword');
+
+            // Live update password rules for admin
+            function updateAdminPasswordRulesUI(pwd) {
+                const checks = {
+                    length: pwd.length >= 8,
+                    upper: /[A-Z]/.test(pwd),
+                    lower: /[a-z]/.test(pwd),
+                    digit: /[0-9]/.test(pwd),
+                    special: /[!@#\$%\^&\*_\-\?]/.test(pwd),
+                    nospace: !/\s/.test(pwd),
+                    notcommon: !['123456','password','admin','12345678','qwerty','letmein','welcome','password1','12345','passw0rd'].includes(pwd.toLowerCase())
+                };
+                document.getElementById('admin-rule-length').style.color = checks.length ? '#2ecc71' : '#d32f2f';
+                document.getElementById('admin-rule-upper').style.color = checks.upper ? '#2ecc71' : '#d32f2f';
+                document.getElementById('admin-rule-lower').style.color = checks.lower ? '#2ecc71' : '#d32f2f';
+                document.getElementById('admin-rule-digit').style.color = checks.digit ? '#2ecc71' : '#d32f2f';
+                document.getElementById('admin-rule-special').style.color = checks.special ? '#2ecc71' : '#d32f2f';
+                document.getElementById('admin-rule-no-space').style.color = checks.nospace ? '#2ecc71' : '#d32f2f';
+                document.getElementById('admin-rule-not-common').style.color = checks.notcommon ? '#2ecc71' : '#d32f2f';
+                return checks;
+            }
+
+            adminPassword.addEventListener('input', (e) => updateAdminPasswordRulesUI(e.target.value));
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 // Clear previous messages
@@ -212,6 +249,13 @@
                     showMsg('Passwords do not match.', false);
                     return;
                 }
+                // Validate password complexity before submit
+                const adminChecks = updateAdminPasswordRulesUI(password);
+                const adminFailed = Object.entries(adminChecks).filter(([k, v]) => !v).map(x => x[0]);
+                if (adminFailed.length > 0) {
+                    showMsg('Password does not meet complexity requirements.', false);
+                    return;
+                }
                 if (securityCode !== '1575') {
                     showMsg('Invalid security code.', false);
                     return;
@@ -228,7 +272,7 @@
                     const res = await fetch('/api/register/admin', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminName, adminId, email: adminEmail, password, securityCode, otp: otpValue })
+                        body: JSON.stringify({ adminName, adminId, email: adminEmail, password, confirmPassword, securityCode, otp: otpValue })
                     });
                     const data = await res.json();
                     if (res.ok) {
@@ -239,7 +283,12 @@
                             window.location.href = 'login.html';
                         }, 2000);
                     } else {
-                        showMsg(data.error || 'Registration failed.', false);
+                        // show details when available
+                        if (data && data.error && data.details && Array.isArray(data.details)) {
+                            showMsg((data.error || 'Registration failed') + ': ' + data.details.join('; '), false);
+                        } else {
+                            showMsg(data.error || 'Registration failed.', false);
+                        }
                     }
                 } catch (err) {
                     showMsg('Server error. Please try again later.', false);

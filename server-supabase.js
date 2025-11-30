@@ -16,6 +16,50 @@ const PORT = process.env.PORT || 3005;
 const JWT_SECRET = 'your-secret-key'; // Use the same secret key as server-new.js
 const ADMIN_EMAILS = ['jyoti2006@gmail.com']; // <-- Replace with your actual admin email
 
+// Password validation helper (server-side enforcement)
+const weakPasswords = new Set([
+    '123456', 'password', 'admin', '12345678', 'qwerty', 'letmein', 'welcome', 'password1', '12345', 'passw0rd'
+]);
+
+function validatePassword(password) {
+    const errors = [];
+    if (typeof password !== 'string') {
+        errors.push('Password must be a string');
+        return { valid: false, errors };
+    }
+
+    if (password.includes(' ')) {
+        errors.push('Password cannot contain spaces');
+    }
+
+    if (password.length < 8) {
+        errors.push('Password must be at least 8 characters long');
+    }
+
+    if (!/[A-Z]/.test(password)) {
+        errors.push('Password must contain at least one uppercase letter (A-Z)');
+    }
+
+    if (!/[a-z]/.test(password)) {
+        errors.push('Password must contain at least one lowercase letter (a-z)');
+    }
+
+    if (!/[0-9]/.test(password)) {
+        errors.push('Password must contain at least one digit (0-9)');
+    }
+
+    // allowed special characters: ! @ # $ % ^ & * _ - ?
+    if (!/[!@#\$%\^&\*_\-\?]/.test(password)) {
+        errors.push('Password must include at least one special character (! @ # $ % ^ & * _ - ?)');
+    }
+
+    if (weakPasswords.has(password.toLowerCase())) {
+        errors.push('This password is too common or weak — please choose a stronger password');
+    }
+
+    return { valid: errors.length === 0, errors };
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -875,7 +919,7 @@ app.post('/api/register/send-otp', async (req, res) => {
 
 app.post('/api/register/user', async (req, res) => {
     try {
-        const { fullName, email, phoneNumber, password, otp } = req.body;
+        const { fullName, email, phoneNumber, password, confirmPassword, otp } = req.body;
         
         // Check if user exists
         const existingUser = await SupabaseDB.getUserByEmail(email);
@@ -900,6 +944,13 @@ app.post('/api/register/user', async (req, res) => {
             return res.status(400).json({ error: 'Invalid or expired OTP' });
         }
 
+        // Validate passwords
+        if (!confirmPassword) return res.status(400).json({ error: 'Please confirm your password' });
+        if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
+
+        const { valid, errors } = validatePassword(password);
+        if (!valid) return res.status(400).json({ error: 'Password validation failed', details: errors });
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = {
             full_name: fullName,
@@ -923,7 +974,7 @@ app.post('/api/register/user', async (req, res) => {
 // Admin Registration
 app.post('/api/register/admin', async (req, res) => {
     try {
-        const { adminName, email, adminId, password, securityCode, otp } = req.body;
+        const { adminName, email, adminId, password, confirmPassword, securityCode, otp } = req.body;
 
         if (securityCode !== '1575') {
             return res.status(403).json({ error: 'Invalid Security Code. You are not authorized to register as admin.' });
@@ -950,6 +1001,13 @@ app.post('/api/register/admin', async (req, res) => {
         if (otpError || !otpRecord) {
             return res.status(400).json({ error: 'Invalid or expired OTP' });
         }
+
+        // Validate passwords
+        if (!confirmPassword) return res.status(400).json({ error: 'Please confirm your password' });
+        if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
+
+        const { valid, errors } = validatePassword(password);
+        if (!valid) return res.status(400).json({ error: 'Password validation failed', details: errors });
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newAdmin = {
