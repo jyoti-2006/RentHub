@@ -21,6 +21,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Root route - serve index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Middleware to verify user token
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
