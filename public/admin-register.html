@@ -102,9 +102,19 @@
                     <label for="adminId">Admin ID</label>
                     <input type="text" id="adminId" placeholder="Admin ID" required>
                 </div>
-                <div class="form-group">
-                    <label for="adminEmail">Email Address</label>
-                    <input type="email" id="adminEmail" placeholder="Email Address" required>
+                <div class="form-group email-verify-row" style="display:flex;gap:8px;align-items:center;">
+                    <div style="flex:1">
+                        <label for="adminEmail">Email Address</label>
+                        <input type="email" id="adminEmail" placeholder="Email Address" required>
+                    </div>
+                    <div>
+                        <button type="button" id="adminSendOtpBtn" class="btn" style="margin-top:22px">Verify Email</button>
+                    </div>
+                </div>
+                <div class="form-group" id="adminOtpGroup" style="display:none">
+                    <label for="adminOtp">Enter OTP</label>
+                    <input type="text" id="adminOtp" placeholder="6-digit OTP" maxlength="6">
+                    <small id="adminOtpInfo" style="display:block;color:#555;margin-top:6px">An OTP will expire in 10 minutes.</small>
                 </div>
                 <div class="form-group">
                     <label for="adminPassword">Password</label>
@@ -124,7 +134,7 @@
                     <label for="securityCode">Security Code</label>
                     <input type="text" id="securityCode" placeholder="Security Code" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Register</button>
+                <button type="submit" class="btn btn-primary" id="adminRegisterSubmit">Register</button>
             </form>
             <p>Already have an account? <a href="login.html" id="showAdminLogin">Login</a></p>
             <p>Register as <a href="user-register.html" id="showUserRegister">User</a></p>
@@ -148,6 +158,36 @@
 
         // Admin registration backend integration
         document.addEventListener('DOMContentLoaded', function() {
+            const adminSendOtpBtn = document.getElementById('adminSendOtpBtn');
+            const adminOtpGroup = document.getElementById('adminOtpGroup');
+            const adminOtpInput = document.getElementById('adminOtp');
+            const adminRegisterSubmit = document.getElementById('adminRegisterSubmit');
+
+            // Send OTP for admin email verification
+            adminSendOtpBtn.addEventListener('click', async () => {
+                const email = document.getElementById('adminEmail').value.trim();
+                if (!email) return alert('Please enter email first');
+                adminSendOtpBtn.disabled = true;
+                adminSendOtpBtn.textContent = 'Sending...';
+                try {
+                    const r = await fetch('/api/register/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
+                    const j = await r.json();
+                    if (r.ok) {
+                        adminOtpGroup.style.display = 'block';
+                        alert(j.message || 'OTP sent to your email');
+                    } else {
+                        alert(j.error || 'Failed to send OTP');
+                    }
+                } catch (err) {
+                    alert('Failed to send OTP, please try again later');
+                }
+                adminSendOtpBtn.disabled = false;
+                adminSendOtpBtn.textContent = 'Verify Email';
+            });
             const form = document.getElementById('adminRegisterForm');
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
@@ -177,12 +217,18 @@
                     return;
                 }
 
+                // Ensure otp supplied
+                const otpValue = document.getElementById('adminOtp') ? document.getElementById('adminOtp').value.trim() : '';
+                if (!otpValue) {
+                    showMsg('Please verify your email using the OTP before submitting.', false);
+                    return;
+                }
                 // Send to backend
                 try {
                     const res = await fetch('/api/register/admin', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminName, adminId, email: adminEmail, password, securityCode })
+                        body: JSON.stringify({ adminName, adminId, email: adminEmail, password, securityCode, otp: otpValue })
                     });
                     const data = await res.json();
                     if (res.ok) {
