@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createVehicleCardHtml(vehicle, type) {
+        const bookClass = type === 'bike' ? 'btn-book-bike' : (type === 'scooty' ? 'btn-book-scooty' : 'btn-book-car');
         return `
             <div class="vehicle-card" data-id="${vehicle.id}" data-type="${type}">
                 <img src="${vehicle.image_url}" alt="${vehicle.name}">
@@ -58,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ${!vehicle.is_available
                     ? '<button class="btn btn-secondary" disabled style="background:#aaa;cursor:not-allowed;opacity:0.7;">Unavailable</button>'
-                    : `<a href="booking-form.html?vehicleId=${vehicle.id}&type=${type}" class="btn btn-primary">Book Now</a>`
+                    : `<a href="booking-form.html?vehicleId=${vehicle.id}&type=${type}" class="btn btn-book ${bookClass}">Book Now</a>`
                 }
             </div>
         `;

@@ -13,6 +13,30 @@
     --transition: all 0.3s ease;
 }
 
+/* Soft purple gradient registration background */
+.gradient-reg {
+    background: linear-gradient(180deg, #A18CD1 0%, #FBC2EB 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gradient-reg .auth-container {
+    max-width: 680px;
+    width: 95%;
+    margin: 0 auto;
+    padding: 30px;
+    background: #FFFFFF; /* form card stays white */
+    border-radius: 14px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.08); /* soft shadow */
+    border: 1px solid rgba(0,0,0,0.04);
+}
+
+.gradient-reg .auth-form h2 { color: #333333; }
+.gradient-reg .auth-form { background: transparent; }
+.gradient-reg .auth-form .btn-primary { background: #6A0DAD; color: #ffffff; }
+
 * {
     margin: 0;
     padding: 0;
@@ -99,6 +123,10 @@ body {
     transition: var(--transition);
     text-decoration: none;
     display: inline-block;
+    /* make every button use the primary color by default */
+    background-color: var(--primary-color);
+    color: var(--white);
+    border: 1px solid rgba(0,0,0,0.06);
 }
 
 .btn-primary {
@@ -111,12 +139,13 @@ body {
 }
 
 .btn-login {
-    background-color: var(--dark-color);
+    /* Login buttons use the primary theme color */
+    background-color: var(--primary-color);
     color: var(--white);
 }
 
 .btn-login:hover {
-    background-color: #3f5872; /* A slightly lighter shade for hover */
+    background-color: var(--secondary-color);
 }
 
 .btn-secondary {
@@ -231,21 +260,42 @@ body {
 
 /* Verify Email button style (used for small inline verification buttons) */
 .btn-verify {
-    background-color: #1976d2; /* blue */
+    background-color: var(--primary-color);
     color: var(--white);
     padding: 0.6rem 0.9rem;
     border-radius: 8px;
     font-weight: 600;
     border: none;
-    box-shadow: 0 2px 8px rgba(25,118,210,0.15);
+    box-shadow: 0 2px 8px rgba(106,13,173,0.12);
 }
-.btn-verify:hover {
-    background-color: #125b9b; /* darker blue */
-}
+.btn-verify:hover { background-color: var(--secondary-color); }
 .btn-verify:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* Vehicle-specific Book Now button styles */
+.btn-book {
+    padding: 0.65rem 1rem;
+    border-radius: 10px;
+    font-weight: 700; /* bold */
+    color: #ffffff;
+    text-decoration: none;
+    display: inline-block;
+    font-family: inherit;
+    font-size: 0.98rem;
+    min-width: 110px;
+    text-align: center;
+}
+
+.btn-book-bike { background-color: #28A745; }
+.btn-book-bike:hover { background-color: #218838; }
+
+.btn-book-scooty { background-color: #FF9500; }
+.btn-book-scooty:hover { background-color: #e07a00; }
+
+.btn-book-car { background-color: #0A84FF; }
+.btn-book-car:hover { background-color: #006fe6; }
 
 /* Links within auth forms */
 .auth-form p {

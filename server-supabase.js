@@ -1699,6 +1699,76 @@ app.post('/api/forgot-password', async (req, res) => {
     }
 });
 
+// Admin forgot password: only send OTP if the email belongs to an admin user
+app.post('/api/admin/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        // Normalize email
+        const normalized = String(email).trim().toLowerCase();
+
+        // First check if there's an 'admins' table (preferred) — if not fall back to 'users' with is_admin flag
+        let { data: adminRow, error: adminErr } = await supabase
+            .from('admins')
+            .select('id, email, full_name')
+            .eq('email', normalized)
+            .maybeSingle();
+
+        if (adminErr && adminErr.code !== 'PGRST116') {
+            // PGRST116 sometimes indicates no such table — ignore and fall back
+            console.error('Error while checking admins table:', adminErr);
+            // continue to fallback check
+            adminRow = null;
+        }
+
+        if (!adminRow) {
+            // fallback: check users table for is_admin=true
+            const { data: userRow, error: userErr } = await supabase
+                .from('users')
+                .select('id, email, full_name, is_admin')
+                .eq('email', normalized)
+                .single();
+
+            if (userErr || !userRow || !userRow.is_admin) {
+                return res.status(404).json({ error: 'This email is not registered as admin' });
+            }
+            adminRow = userRow; // treat as admin
+        }
+
+        // At this point, we have an adminRow — generate OTP and persist to password_reset_otps
+        const otp = generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+        // Upsert OTP record, associate user_id when available
+        const { error: otpError } = await supabase.from('password_reset_otps').upsert({
+            user_id: adminRow.id || null,
+            email: adminRow.email,
+            otp: otp,
+            expires_at: otpExpiry,
+            created_at: new Date().toISOString()
+        });
+
+        if (otpError) {
+            console.error('Error storing admin OTP:', otpError);
+            return res.status(500).json({ error: 'Error generating OTP for admin' });
+        }
+
+        // Send OTP email to admin
+        const emailResult = await sendPasswordResetOTP(adminRow.email, adminRow.full_name || 'Admin', otp);
+        if (emailResult.success) {
+            return res.json({ message: 'OTP sent successfully to admin email' });
+        } else {
+            console.error('Failed to send admin OTP email:', emailResult.error);
+            return res.status(500).json({ error: 'Failed to send OTP email to admin' });
+        }
+    } catch (err) {
+        console.error('Unhandled error in /api/admin/forgot-password:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Forgot Password: Verify OTP and Reset Password
 app.post('/api/reset-password', async (req, res) => {
     try {
@@ -1727,17 +1797,44 @@ app.post('/api/reset-password', async (req, res) => {
             return;
         }
 
+        // Fetch user to check existing password (by user_id if available, else by email)
+        let userRow = null;
+        if (otpRecord.user_id) {
+            const { data, error } = await supabase.from('users').select('id, password').eq('id', otpRecord.user_id).single();
+            if (!error) userRow = data;
+        } else {
+            const { data, error } = await supabase.from('users').select('id, password').eq('email', email).single();
+            if (!error) userRow = data;
+        }
+
+        // If user found, check that newPassword != old password
+        if (userRow && userRow.password) {
+            const isSame = await bcrypt.compare(newPassword, userRow.password);
+            if (isSame) {
+                return res.status(400).json({ error: 'This is your old password — please choose a different password' });
+            }
+        }
+
         // Hash new password
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         // Update user password
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ password: hashedPassword })
-            .eq('id', otpRecord.user_id);
+        let updateResult;
+        if (otpRecord.user_id) {
+            updateResult = await supabase
+                .from('users')
+                .update({ password: hashedPassword })
+                .eq('id', otpRecord.user_id);
+        } else {
+            // fallback: update by email if user_id was not stored
+            updateResult = await supabase
+                .from('users')
+                .update({ password: hashedPassword })
+                .eq('email', email);
+        }
 
-        if (updateError) {
-            console.error('Error updating password:', updateError);
+        if (updateResult.error) {
+            console.error('Error updating password:', updateResult.error);
             return res.status(500).json({ error: 'Error updating password' });
         }
 

@@ -239,21 +239,12 @@ body {
 }
 
 /* User Action Buttons */
-.btn-view-user {
-    background: linear-gradient(90deg, #2196f3 0%, #21cbf3 100%);
-    color: #fff;
-}
-.btn-edit-user {
-    background: linear-gradient(90deg, #ffb300 0%, #ffca28 100%);
-    color: #333;
-}
-.btn-block-user {
-    background: linear-gradient(90deg, #e53935 0%, #ff5252 100%);
-    color: #fff;
-}
+.btn-view-user,
+.btn-edit-user,
+.btn-block-user,
 .btn-unblock-user {
-    background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
-    color: #0b4c3a;
+    background: var(--primary-color);
+    color: #fff;
 }
 #users-table .action-btn {
     padding: 7px 14px;
@@ -361,22 +352,8 @@ body {
     align-items: center;
     gap: 6px;
 }
-.btn-view {
-    background: linear-gradient(90deg, #2196f3 0%, #21cbf3 100%);
-}
-.btn-edit {
-    background: linear-gradient(90deg, #ffb300 0%, #ffca28 100%);
-    color: #333;
-}
-.btn-delete, .btn-reject {
-    background: linear-gradient(90deg, #e53935 0%, #ff5252 100%);
-}
-.btn-confirm {
-    background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
-    color: #0b4c3a;
-}
-.btn-confirm-refund {
-    background: linear-gradient(90deg, #8e2de2 0%, #4a00e0 100%);
+.btn-view, .btn-edit, .btn-delete, .btn-reject, .btn-confirm, .btn-confirm-refund {
+    background: var(--primary-color);
     color: #fff;
 }
 .action-btn:hover {
@@ -500,7 +477,7 @@ body {
 
 /* Vehicle Action Buttons */
 .btn-view-vehicle {
-    background: #007bff;
+    background: var(--primary-color);
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -515,7 +492,7 @@ body {
 }
 
 .btn-edit-vehicle {
-    background: #ff9800;
+    background: var(--primary-color);
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -530,7 +507,7 @@ body {
 }
 
 .btn-delete-vehicle {
-    background: #e53935;
+    background: var(--primary-color);
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -545,7 +522,7 @@ body {
 }
 
 .cancel-btn {
-    background-color: #ff9800;
+    background-color: var(--primary-color);
     color: white;
     border: none;
     padding: 8px 16px;
