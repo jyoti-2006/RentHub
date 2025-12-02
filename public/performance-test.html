@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RentHub Performance Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; }
+        .test { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #3B82F6; }
+        .test.pass { border-left-color: #10B981; background: #f0fdf4; }
+        .test.fail { border-left-color: #EF4444; background: #fef2f2; }
+        button { background: #3B82F6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #1E40AF; }
+        .result { margin-top: 10px; font-weight: bold; }
+        h2 { color: #1e3c72; }
+    </style>
+</head>
+<body>
+    <h1>🚀 RentHub Performance Test</h1>
+    
+    <div class="test">
+        <h3>Test 1: Compression Enabled</h3>
+        <p>Check if gzip compression is working</p>
+        <button onclick="testCompression()">Test Compression</button>
+        <div id="compression-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Test 2: Dashboard Stats (with caching)</h3>
+        <p>Should be fast after first load (~200ms with cache)</p>
+        <button onclick="testDashboardStats()">Test Dashboard Stats</button>
+        <div id="dashboard-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Test 3: Bookings Pagination</h3>
+        <p>Load bookings with pagination (page=1, limit=20)</p>
+        <button onclick="testBookingsPagination()">Test Bookings Pagination</button>
+        <div id="bookings-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Test 4: API Response Times</h3>
+        <p>Compare response times across endpoints</p>
+        <button onclick="testAllEndpoints()">Run Full Performance Test</button>
+        <div id="perf-result"></div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('adminToken');
+        
+        if (!token) {
+            document.body.innerHTML = '<h2>❌ Not logged in</h2><p>Please login to your admin panel first.</p>';
+        }
+
+        async function testCompression() {
+            const resultDiv = document.getElementById('compression-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/dashboard-stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const encoded = response.headers.get('content-encoding');
+                const size = response.headers.get('content-length');
+                
+                if (encoded === 'gzip') {
+                    resultDiv.innerHTML = `<div class="result pass">✅ Compression: GZIP enabled (Size: ${size} bytes)</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="result fail">⚠️ Compression: Not detected (Encoding: ${encoded || 'none'})</div>`;
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="result fail">❌ Error: ${e.message}</div>`;
+            }
+        }
+
+        async function testDashboardStats() {
+            const resultDiv = document.getElementById('dashboard-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            const times = [];
+            for (let i = 0; i < 3; i++) {
+                const start = performance.now();
+                const response = await fetch('/api/dashboard-stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                await response.json();
+                const end = performance.now();
+                times.push((end - start).toFixed(0));
+            }
+            
+            const avg = Math.round(times.reduce((a,b) => a + parseInt(b), 0) / times.length);
+            const status = avg < 300 ? 'pass' : avg < 800 ? 'warn' : 'fail';
+            
+            resultDiv.innerHTML = `
+                <div class="result ${status}">
+                    Load Times: ${times.join('ms, ')}ms<br>
+                    Average: ${avg}ms
+                    ${avg < 300 ? '✅ Cached' : avg < 800 ? '⚠️ Slow' : '❌ Very Slow'}
+                </div>
+            `;
+        }
+
+        async function testBookingsPagination() {
+            const resultDiv = document.getElementById('bookings-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const start = performance.now();
+                const response = await fetch('/api/admin/bookings?page=1&limit=20', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                const end = performance.now();
+                
+                const time = (end - start).toFixed(0);
+                const hasPagination = data.pagination !== undefined;
+                const count = Array.isArray(data) ? data.length : data.data?.length || 0;
+                
+                resultDiv.innerHTML = `
+                    <div class="result ${hasPagination ? 'pass' : 'warn'}">
+                        Response Time: ${time}ms<br>
+                        Pagination: ${hasPagination ? '✅ Yes' : '⚠️ No (legacy format)'}<br>
+                        Items Loaded: ${count}
+                    </div>
+                `;
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="result fail">❌ Error: ${e.message}</div>`;
+            }
+        }
+
+        async function testAllEndpoints() {
+            const resultDiv = document.getElementById('perf-result');
+            resultDiv.innerHTML = 'Running full test...';
+            
+            const results = [];
+            const endpoints = [
+                { name: 'Dashboard Stats', url: '/api/dashboard-stats' },
+                { name: 'Bookings (Page 1)', url: '/api/admin/bookings?page=1&limit=20' },
+                { name: 'Users', url: '/api/admin/users' },
+                { name: 'Vehicles', url: '/api/admin/vehicles' }
+            ];
+            
+            for (const ep of endpoints) {
+                try {
+                    const start = performance.now();
+                    const response = await fetch(ep.url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    await response.json();
+                    const time = (performance.now() - start).toFixed(0);
+                    results.push({ name: ep.name, time: parseInt(time) });
+                } catch (e) {
+                    results.push({ name: ep.name, time: 'ERROR' });
+                }
+            }
+            
+            const html = results.map(r => {
+                let status = 'pass';
+                if (typeof r.time === 'number') {
+                    status = r.time < 500 ? 'pass' : r.time < 1000 ? 'warn' : 'fail';
+                    return `<div class="result ${status}">✅ ${r.name}: ${r.time}ms</div>`;
+                } else {
+                    return `<div class="result fail">❌ ${r.name}: ${r.time}</div>`;
+                }
+            }).join('');
+            
+            resultDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

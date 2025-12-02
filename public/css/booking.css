@@ -1,0 +1,12 @@
+body{font-family:Arial,Helvetica,sans-serif;background:#f6f8fb;margin:0;padding:20px}
+.container{max-width:800px;margin:20px auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 6px 18px rgba(22,30,50,0.06)}
+.logo img{height:44px}
+h1{color:#0b5cff;margin-top:6px}
+label{display:block;margin:8px 0;color:#333}
+input[type=text],input[type=email],input[type=number],input[name],input{padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;box-sizing:border-box}
+button{background:#0b5cff;color:#fff;padding:10px 14px;border:none;border-radius:6px;cursor:pointer}
+.card{background:#fff;border:1px solid #eee;padding:12px;border-radius:6px;margin-top:12px}
+.result{margin-top:12px}
+.success{border-left:4px solid #2a9d8f;padding-left:10px}
+.error{border-left:4px solid #e63946;padding-left:10px}
+@media (max-width:600px){.container{padding:12px}}

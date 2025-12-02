@@ -179,5 +179,6 @@ module.exports = {
     sendBookingConfirmationEmail,
     sendPasswordResetOTP,
     sendRegistrationOTP,
-    sendRefundCompleteEmail
-}; 
+    sendRefundCompleteEmail,
+    transporter
+};

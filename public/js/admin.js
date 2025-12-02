@@ -83,16 +83,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allBookings = [];
 
-    async function loadBookings() {
+    async function loadBookings(page = 1) {
         const tableBody = document.getElementById('bookings-table-body');
         tableBody.innerHTML = '<tr><td colspan="11">Loading bookings...</td></tr>';
 
         try {
-            const response = await fetch('/api/admin/bookings', {
+            const response = await fetch(`/api/admin/bookings?page=${page}&limit=20`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Failed to fetch bookings');
-            allBookings = await response.json();
+            const result = await response.json();
+
+            // Support both new paginated format { data, pagination } and legacy array responses
+            if (Array.isArray(result)) {
+                allBookings = result;
+            } else if (result && Array.isArray(result.data)) {
+                allBookings = result.data;
+                // Optionally you can read pagination info: result.pagination
+            } else {
+                // Unexpected format
+                throw new Error('Unexpected bookings response format');
+            }
+
             renderBookingsTable();
         } catch (error) {
             console.error('Error loading bookings:', error);

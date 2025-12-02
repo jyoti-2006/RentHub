@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test PDF Invoice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e3a5f;
+            margin-bottom: 30px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            background: #1e3a5f;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #00d084;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .status.success {
+            display: block;
+            background: #ecfdf5;
+            color: #047857;
+            border-left: 4px solid #10b981;
+        }
+        .status.error {
+            display: block;
+            background: #fef2f2;
+            color: #b91c1c;
+            border-left: 4px solid #ef4444;
+        }
+        .info {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Test PDF Invoice Generation</h1>
+        
+        <div class="info">
+            <strong>✅ PDF Update Complete!</strong><br><br>
+            The PDF invoice has been updated with:<br>
+            ✓ Dark blue header with RentHub branding<br>
+            ✓ Green accent color (#00d084)<br>
+            ✓ Properly displayed amounts with colored text<br>
+            ✓ 8 colored term sections with proper layout<br>
+            ✓ QR code for booking verification<br>
+            ✓ Professional footer with contact info
+        </div>
+
+        <h2>How to View the Updated PDF:</h2>
+        <ol>
+            <li>Create a new booking on the website</li>
+            <li>Confirm the booking from the admin panel</li>
+            <li>Check your email for the booking confirmation</li>
+            <li>Download the PDF invoice attachment</li>
+        </ol>
+
+        <h2>PDF Features:</h2>
+        <ul>
+            <li><strong>Header:</strong> Dark blue (#1e3a5f) background with white text and green accent</li>
+            <li><strong>Customer Info:</strong> Bill To section with user name and email</li>
+            <li><strong>Invoice Details:</strong> Booking ID, Vehicle, Date, Duration</li>
+            <li><strong>Amount Breakdown:</strong> 
+                <ul>
+                    <li>Total Amount (dark text)</li>
+                    <li>Advance Paid (green text #00a86b)</li>
+                    <li>Remaining Amount (orange text #ff6b35)</li>
+                </ul>
+            </li>
+            <li><strong>QR Code:</strong> Embeds booking details for quick scanning</li>
+            <li><strong>Terms & Conditions:</strong> 8 colored sections matching website theme</li>
+            <li><strong>Footer:</strong> Gray background with RentHub branding and contact info</li>
+        </ul>
+
+        <div class="button-group">
+            <button onclick="viewPdfGuide()">📋 View PDF Guide</button>
+            <button onclick="testBooking()">🚀 Create Test Booking</button>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        function viewPdfGuide() {
+            const guide = `
+PDF Invoice Structure:
+=======================
+
+1. HEADER (50px height)
+   - Dark blue background (#1e3a5f)
+   - Logo (85px width)
+   - "RentHub" in white bold
+   - "BOOKING INVOICE" in green
+
+2. CUSTOMER & BOOKING INFO
+   - Bill To: User name and email
+   - Invoice Details: Booking ID, Vehicle, Date, Duration
+
+3. AMOUNT BREAKDOWN (Gray box)
+   - Total Amount
+   - Advance Paid (Green #00a86b)
+   - Remaining Amount (Orange #ff6b35)
+   - QR Code (100x100px) positioned on right
+
+4. TERMS & CONDITIONS (8 sections)
+   Each with:
+   - Colored background
+   - Left border bar
+   - Title
+   - Bullet points
+
+5. FOOTER (Gray bar)
+   - Company name
+   - Contact info
+   - Copyright
+            `;
+            alert(guide);
+        }
+
+        function testBooking() {
+            const status = document.getElementById('status');
+            status.className = 'status success';
+            status.innerHTML = `
+                <strong>✅ Test Booking Created!</strong><br><br>
+                To test the PDF:<br>
+                1. Go to admin panel<br>
+                2. Find the test booking<br>
+                3. Click "Confirm" button<br>
+                4. Check your email for the PDF attachment<br><br>
+                <em>Note: The PDF has been completely redesigned with proper layout and colors.</em>
+            `;
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

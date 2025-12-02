@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Track Booking — RentHub</title>
+  <link rel="stylesheet" href="/css/booking.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="logo"> <img src="/photo/logo.svg" alt="RentHub"/></header>
+    <h1>Track Booking</h1>
+    <div class="card">
+      <label>Booking ID <input id="bookingId" placeholder="BK-12345" /></label>
+      <button id="check">Check Status</button>
+    </div>
+
+    <div id="output"></div>
+  </div>
+
+  <script>
+    document.getElementById('check').addEventListener('click', async () => {
+      const id = document.getElementById('bookingId').value.trim();
+      if (!id) return alert('Enter booking id');
+      const out = document.getElementById('output');
+      out.textContent = 'Checking...';
+      const r = await fetch(`/api/trackBooking?id=${encodeURIComponent(id)}`);
+      const j = await r.json();
+      if (j.success && j.booking) {
+        out.innerHTML = `
+          <div class="card">
+            <h3>Booking ${j.booking.id}</h3>
+            <p>Status: <b>${j.booking.status}</b></p>
+            <p>Start: ${j.booking.start_date} ${j.booking.start_time}</p>
+            <p>Duration: ${j.booking.duration} hours</p>
+            <p>Advance: ₹${j.booking.advance_payment}</p>
+            <p><a href="/invoices/booking_invoice_${j.booking.id}.pdf" target="_blank">Download Invoice</a></p>
+          </div>
+        `;
+      } else {
+        out.innerHTML = `<div class="card">${j.message || JSON.stringify(j)}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>

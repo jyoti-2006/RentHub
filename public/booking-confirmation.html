@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Booking Confirmation — RentHub</title>
+  <link rel="stylesheet" href="/css/booking.css" />
+ </head>
+ <body>
+  <div class="container">
+    <header class="logo"> <img src="/photo/logo.jpeg" alt="RentHub"/></header>
+    <h1>Booking Confirmation (Demo)</h1>
+
+    <form id="confirmForm">
+      <label>Booking ID <input name="bookingId" placeholder="BK-12345" /></label>
+      <label>Your Name <input name="userName" required /></label>
+      <label>Your Email <input name="userEmail" type="email" required /></label>
+      <label>Vehicle Name <input name="vehicleName" /></label>
+      <label>Start Date & Time <input name="startDateTime" placeholder="2025-12-01T10:00:00" /></label>
+      <label>Duration (hours) <input name="duration" type="number" value="2" /></label>
+      <label>Total Amount <input name="totalAmount" type="number" value="500" /></label>
+      <label>Advance Payment <input name="advancePayment" type="number" value="100" /></label>
+      <button type="submit">Generate Invoice & Send Email</button>
+    </form>
+
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    document.getElementById('confirmForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {};
+      new FormData(form).forEach((v,k)=> data[k]=v);
+      // compute remaining
+      data.remainingAmount = (Number(data.totalAmount || 0) - Number(data.advancePayment || 0));
+
+      const resEl = document.getElementById('result');
+      resEl.textContent = 'Processing...';
+
+      const r = await fetch('/api/confirmBooking', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+      const json = await r.json();
+      if (json.success) {
+        resEl.innerHTML = `<div class="card success">Email sent. <a href="${json.invoicePath}" target="_blank">Download invoice</a></div>`;
+      } else {
+        resEl.innerHTML = `<div class="card error">Error: ${json.error || JSON.stringify(json)}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>

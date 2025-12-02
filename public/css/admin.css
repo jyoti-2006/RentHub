@@ -1,5 +1,13 @@
 /* Modern Blue/Teal Admin Panel Theme */
 
+:root {
+    --primary-color: #285a8c;
+    --accent-color: #2ec4b6;
+    --danger-color: #dc3545;
+    --warning-color: #ffb347;
+    --success-color: #43e97b;
+}
+
 body {
     background: #f4f8fb;
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -243,9 +251,48 @@ body {
 .btn-edit-user,
 .btn-block-user,
 .btn-unblock-user {
-    background: var(--primary-color);
     color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    font-size: 15px;
+    margin-right: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
 }
+
+.btn-view-user {
+    background: #3B82F6;
+}
+
+.btn-view-user:hover {
+    background: #1E40AF;
+}
+
+.btn-edit-user {
+    background: #F59E0B;
+}
+
+.btn-edit-user:hover {
+    background: #D97706;
+}
+
+.btn-block-user {
+    background: #EF4444;
+}
+
+.btn-block-user:hover {
+    background: #DC2626;
+}
+
+.btn-unblock-user {
+    background: #10B981;
+}
+
+.btn-unblock-user:hover {
+    background: #059669;
+}
+
 #users-table .action-btn {
     padding: 7px 14px;
     border: none;
@@ -263,7 +310,6 @@ body {
     transition: background 0.2s, box-shadow 0.2s;
 }
 #users-table .action-btn:hover {
-    filter: brightness(0.95) saturate(1.2);
     box-shadow: 0 4px 12px rgba(30,60,114,0.10);
 }
 
@@ -352,12 +398,111 @@ body {
     align-items: center;
     gap: 6px;
 }
-.btn-view, .btn-edit, .btn-delete, .btn-reject, .btn-confirm, .btn-confirm-refund {
-    background: var(--primary-color);
+
+/* Default button colors - Updated Color Scheme */
+.btn-view, 
+.btn-view-user,
+.btn-view-vehicle {
+    background: #3B82F6;
     color: #fff;
 }
+
+.btn-view:hover, 
+.btn-view-user:hover,
+.btn-view-vehicle:hover {
+    background: #1E40AF;
+    filter: none;
+}
+
+.btn-edit, 
+.btn-edit-user,
+.btn-edit-vehicle {
+    background: #F59E0B;
+    color: #fff;
+}
+
+.btn-edit:hover,
+.btn-edit-user:hover,
+.btn-edit-vehicle:hover {
+    background: #D97706;
+    filter: none;
+}
+
+.btn-confirm,
+.btn-confirm-refund {
+    background: #10B981;
+    color: #fff;
+}
+
+.btn-confirm:hover,
+.btn-confirm-refund:hover {
+    background: #059669;
+    filter: none;
+}
+
+.btn-delete,
+.btn-delete-vehicle {
+    background: #B91C1C;
+    color: #fff;
+}
+
+.btn-delete:hover,
+.btn-delete-vehicle:hover {
+    background: #7F1D1D;
+    filter: none;
+}
+
+.btn-reject {
+    background: #EF4444;
+    color: #fff;
+}
+
+.btn-reject:hover {
+    background: #DC2626;
+    filter: none;
+}
+
+.btn-block-user {
+    background: #EF4444;
+    color: #fff;
+}
+
+.btn-block-user:hover {
+    background: #DC2626;
+    filter: none;
+}
+
+.btn-unblock-user {
+    background: #10B981;
+    color: #fff;
+}
+
+.btn-unblock-user:hover {
+    background: #059669;
+    filter: none;
+}
+
+.confirm-btn {
+    background: #10B981;
+    color: #fff;
+}
+
+.confirm-btn:hover {
+    background: #059669;
+    filter: none;
+}
+
+.reject-btn {
+    background: #EF4444;
+    color: #fff;
+}
+
+.reject-btn:hover {
+    background: #DC2626;
+    filter: none;
+}
+
 .action-btn:hover {
-    filter: brightness(0.95) saturate(1.2);
     box-shadow: 0 4px 12px rgba(30,60,114,0.10);
 }
 
@@ -477,7 +622,7 @@ body {
 
 /* Vehicle Action Buttons */
 .btn-view-vehicle {
-    background: var(--primary-color);
+    background: #3B82F6;
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -488,11 +633,11 @@ body {
     transition: background 0.2s;
 }
 .btn-view-vehicle:hover {
-    background: #0056b3;
+    background: #1E40AF;
 }
 
 .btn-edit-vehicle {
-    background: var(--primary-color);
+    background: #F59E0B;
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -503,11 +648,11 @@ body {
     transition: background 0.2s;
 }
 .btn-edit-vehicle:hover {
-    background: #e65100;
+    background: #D97706;
 }
 
 .btn-delete-vehicle {
-    background: var(--primary-color);
+    background: #B91C1C;
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -518,7 +663,7 @@ body {
     transition: background 0.2s;
 }
 .btn-delete-vehicle:hover {
-    background: #b71c1c;
+    background: #7F1D1D;
 }
 
 .cancel-btn {

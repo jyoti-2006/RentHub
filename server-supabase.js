@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -15,6 +16,13 @@ const app = express();
 const PORT = process.env.PORT || 3005;
 const JWT_SECRET = 'your-secret-key'; // Use the same secret key as server-new.js
 const ADMIN_EMAILS = ['jyoti2006@gmail.com']; // <-- Replace with your actual admin email
+
+// Simple in-memory cache
+const cache = {
+    dashboardStats: null,
+    dashboardStatsTimestamp: 0,
+    ttl: 60000 // 60 seconds
+};
 
 // Password validation helper (server-side enforcement)
 const weakPasswords = new Set([
@@ -62,8 +70,226 @@ function validatePassword(password) {
 
 // Middleware
 app.use(cors());
+app.use(compression()); // Enable gzip compression
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Booking confirmation + invoice routes (PDF, QR, Email)
+try {
+    const bookingConfirmationRoutes = require('./services/bookingConfirmation');
+    app.use('/api', bookingConfirmationRoutes);
+} catch (err) {
+    console.warn('Booking confirmation routes not loaded:', err.message);
+}
+
+// Helper function: Generate PDF invoice and return as buffer
+const generateInvoiceBuffer = async (bookingId, userName, userEmail, vehicleName, duration, startDateTime, totalAmount, advancePayment, terms = 'Standard RentHub terms apply.') => {
+    const PDFDocument = require('pdfkit');
+    const QRCode = require('qrcode');
+    const fs = require('fs');
+    const path = require('path');
+
+    try {
+        // Generate QR payload
+        const qrPayload = { bookingId, userName, vehicleName, pickupDateTime: startDateTime, totalAmount };
+        const qrDataUrl = await QRCode.toDataURL(JSON.stringify(qrPayload));
+        const qrBase64 = qrDataUrl.split(',')[1];
+        const qrBuffer = Buffer.from(qrBase64, 'base64');
+
+        // Create PDF in memory
+        const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: `Invoice ${bookingId}`, Author: 'RentHub' } });
+        let buffers = [];
+        doc.on('data', (chunk) => buffers.push(chunk));
+
+        // Try to find a logo file (prefer png/jpg)
+        const photoDir = path.join(__dirname, 'public', 'photo');
+        const logoCandidates = ['logo.png', 'logo.jpg', 'logo.jpeg', 'KD.jpg', 'JSP.jpg'];
+        let logoPath = null;
+        for (const name of logoCandidates) {
+            const p = path.join(photoDir, name);
+            if (fs.existsSync(p)) { logoPath = p; break; }
+        }
+
+        const margin = 40;
+        const pageWidth = doc.page.width;
+        const pageHeight = doc.page.height;
+        const contentWidth = pageWidth - (2 * margin);
+
+        // ===== HEADER =====
+        doc.fillColor('#1e3a5f').rect(0, 0, pageWidth, 70).fill();
+        
+        // Logo or placeholder
+        if (logoPath) {
+            try {
+                doc.image(logoPath, margin, 8, { width: 50, height: 50 });
+            } catch (err) {
+                doc.fillColor('#00d084').rect(margin, 8, 50, 50).fill();
+            }
+        } else {
+            doc.fillColor('#00d084').rect(margin, 8, 50, 50).fill();
+        }
+        
+        // Header text
+        doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('RentHub', margin + 60, 12);
+        doc.fillColor('#00d084').fontSize(12).font('Helvetica').text('BOOKING INVOICE', margin + 60, 42);
+        
+        doc.y = 80;
+
+        // ===== CUSTOMER & INVOICE DETAILS =====
+        doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').text('CUSTOMER & BOOKING DETAILS', margin);
+        doc.moveDown(0.3);
+        
+        // Gray background box for details
+        const detailsY = doc.y;
+        doc.fillColor('#f3f4f6').rect(margin, detailsY, contentWidth, 70).fill();
+        doc.strokeColor('#e5e7eb').lineWidth(1).rect(margin, detailsY, contentWidth, 70).stroke();
+        
+        // Left column
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Customer Name:', margin + 12, detailsY + 8);
+        doc.fillColor('#000').fontSize(10).font('Helvetica').text(userName || 'N/A', margin + 12);
+        
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Email:', margin + 12);
+        doc.fillColor('#000').fontSize(9).font('Helvetica').text(userEmail || 'N/A', margin + 12);
+        
+        // Right column
+        const rightColX = margin + (contentWidth / 2);
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Booking ID:', rightColX, detailsY + 8);
+        doc.fillColor('#000').fontSize(10).font('Helvetica').text(bookingId || 'N/A', rightColX);
+        
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Vehicle:', rightColX);
+        doc.fillColor('#000').fontSize(9).font('Helvetica').text(vehicleName || 'N/A', rightColX);
+        
+        doc.y = detailsY + 75;
+
+        // ===== BOOKING DETAILS =====
+        doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').text('RENTAL DETAILS', margin);
+        doc.moveDown(0.3);
+        
+        const bookingDetailsY = doc.y;
+        doc.fillColor('#f3f4f6').rect(margin, bookingDetailsY, contentWidth, 50).fill();
+        doc.strokeColor('#e5e7eb').lineWidth(1).rect(margin, bookingDetailsY, contentWidth, 50).stroke();
+        
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Start Date & Time:', margin + 12, bookingDetailsY + 8);
+        doc.fillColor('#000').fontSize(9).font('Helvetica').text(startDateTime || 'N/A', margin + 12);
+        
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Duration:', rightColX, bookingDetailsY + 8);
+        doc.fillColor('#000').fontSize(9).font('Helvetica').text(`${duration} hours`, rightColX);
+        
+        doc.y = bookingDetailsY + 55;
+
+        // ===== AMOUNT BREAKDOWN =====
+        doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').text('AMOUNT BREAKDOWN', margin);
+        doc.moveDown(0.2);
+        
+        const amountY = doc.y;
+        doc.fillColor('#f3f4f6').rect(margin, amountY, contentWidth - 80, 75).fill();
+        doc.strokeColor('#e5e7eb').lineWidth(1).rect(margin, amountY, contentWidth - 80, 75).stroke();
+        
+        const labelX = margin + 12;
+        const valueX = margin + contentWidth - 120;
+        let lineY = amountY + 10;
+        
+        // Total
+        doc.fillColor('#374151').fontSize(10).font('Helvetica').text('Total Amount:', labelX, lineY);
+        doc.fillColor('#1f2937').fontSize(10).font('Helvetica-Bold').text(`₹${totalAmount.toFixed(2)}`, valueX, lineY);
+        
+        lineY += 18;
+        
+        // Advance
+        doc.fillColor('#374151').fontSize(10).font('Helvetica').text('Advance Paid:', labelX, lineY);
+        doc.fillColor('#00a86b').fontSize(10).font('Helvetica-Bold').text(`₹${(advancePayment || 0).toFixed(2)}`, valueX, lineY);
+        
+        lineY += 18;
+        
+        // Remaining
+        const remaining = (totalAmount || 0) - (advancePayment || 0);
+        doc.fillColor('#374151').fontSize(10).font('Helvetica').text('Remaining:', labelX, lineY);
+        doc.fillColor('#ff6b35').fontSize(10).font('Helvetica-Bold').text(`₹${remaining.toFixed(2)}`, valueX, lineY);
+        
+        // QR Code - Right side of amount box
+        try {
+            const qrSize = 75;
+            const qrX = margin + contentWidth - 75;
+            const qrY = amountY + 5;
+            doc.image(qrBuffer, qrX, qrY, { width: qrSize });
+        } catch (err) {
+            console.warn('QR image error:', err.message);
+        }
+        
+        doc.y = amountY + 80;
+
+        // ===== TERMS & CONDITIONS (Compact) =====
+        doc.fillColor('#1f2937').fontSize(10).font('Helvetica-Bold').text('TERMS & CONDITIONS', margin);
+        doc.moveDown(0.15);
+        
+        const termsSections = [
+            { title: '1. Booking Confirmation', color: '#3b82f6', bgColor: '#eff6ff', titleColor: '#1e40af', items: [
+                'Advance booking confirmed after payment. Confirmation email will be sent.'
+            ] },
+            { title: '2. Advance Payment', color: '#10b981', bgColor: '#ecfdf5', titleColor: '#047857', items: [
+                'Minimum ₹100/- advance required. Remaining paid at pickup.'
+            ] },
+            { title: '3. Cancellation Policy', color: '#f59e0b', bgColor: '#fffbeb', titleColor: '#92400e', items: [
+                '2+ hrs before: Full refund. Within 2 hrs: 50% deducted.'
+            ] },
+            { title: '4. Required Documents', color: '#06b6d4', bgColor: '#ecfdf5', titleColor: '#0e7490', items: [
+                'Valid Aadhar Card required at pickup. Booking cancelled without valid documents.'
+            ] },
+            { title: '5. Bike Usage', color: '#ef4444', bgColor: '#fef2f2', titleColor: '#b91c1c', items: [
+                'Only registered renter can use. Sub-renting strictly prohibited.'
+            ] },
+            { title: '6. Late Return', color: '#f97316', bgColor: '#fff7ed', titleColor: '#c2410c', items: [
+                'Late return charges apply per hour beyond scheduled time.'
+            ] },
+            { title: '7. Refund Policy', color: '#10b981', bgColor: '#ecfdf5', titleColor: '#047857', items: [
+                'Refunds processed within 3-5 working days after cancellation.'
+            ] },
+            { title: '8. Company Rights', color: '#6b7280', bgColor: '#f9fafb', titleColor: '#374151', items: [
+                'Company may cancel due to unforeseen issues. Full refund provided.'
+            ] }
+        ];
+        
+        let termsY = doc.y;
+        for (const section of termsSections) {
+            const sectionHeight = 24 + (section.items.length * 8);
+            
+            // Background
+            doc.fillColor(section.bgColor).rect(margin, termsY, contentWidth, sectionHeight).fill();
+            doc.strokeColor(section.color).lineWidth(1).rect(margin, termsY, contentWidth, sectionHeight).stroke();
+            
+            // Title
+            doc.fillColor(section.titleColor).fontSize(7).font('Helvetica-Bold').text(section.title, margin + 6, termsY + 4);
+            
+            // Items
+            let itemY = termsY + 15;
+            doc.fillColor('#374151').fontSize(6).font('Helvetica');
+            for (const item of section.items) {
+                doc.text('• ' + item, margin + 10, itemY, { width: contentWidth - 18 });
+                itemY += 7;
+            }
+            
+            termsY = itemY + 3;
+        }
+        
+        doc.y = termsY;
+
+        // ===== FOOTER =====
+        const footerY = pageHeight - 40;
+        doc.fillColor('#f3f4f6').rect(0, footerY, pageWidth, 40).fill();
+        doc.fillColor('#6b7280').fontSize(8).font('Helvetica').text('RentHub — Premium Bike & Scooty Rentals | support@renthub.in | +91 98765 43210 | www.renthub.in', margin, footerY + 5, { width: contentWidth });
+        doc.fillColor('#9ca3af').fontSize(7).text('© 2024 RentHub. All rights reserved.', margin, footerY + 22);
+
+        doc.end();
+
+        return new Promise((resolve, reject) => {
+            doc.on('end', () => resolve(Buffer.concat(buffers)));
+            doc.on('error', reject);
+        });
+    } catch (err) {
+        console.error('Error generating invoice buffer:', err);
+        throw err;
+    }
+};
 
 // Root route - serve index.html
 app.get('/', (req, res) => {
@@ -211,7 +437,15 @@ app.get('/api/admin/bookings', verifyAdminToken, async (req, res) => {
             };
         });
 
-        res.json(enrichedBookings);
+        res.json({ 
+            data: enrichedBookings, 
+            pagination: {
+                page: parseInt(req.query.page) || 1,
+                limit: parseInt(req.query.limit) || 20,
+                total: bookings.length,
+                pages: Math.ceil(bookings.length / (parseInt(req.query.limit) || 20))
+            }
+        });
     } catch (error) {
         console.error('Error fetching bookings:', error);
         res.status(500).json({ error: 'Error fetching bookings' });
@@ -399,7 +633,7 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
             return res.status(500).json({ error: 'Error updating booking status' });
         }
 
-        // Send email notification
+        // Send email notification with PDF invoice attached
         if (booking.users?.email && booking.users?.full_name) {
             try {
                 const duration = parseInt(booking.duration) || 0;
@@ -408,31 +642,76 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
                 const advancePayment = parseFloat(booking.advance_payment) || 100;
                 const remainingAmount = totalAmount - advancePayment;
 
-                const bookingDetails = {
-                    vehicleName: vehicle ? vehicle.name : 'N/A',
-                    vehicleType: vehicle ? vehicle.type : booking.vehicle_type || 'N/A',
-                    startDate: booking.start_date || 'N/A',
-                    startTime: booking.start_time || 'N/A',
-                    duration: duration,
-                    totalAmount: totalAmount,
-                    advancePayment: advancePayment,
-                    remainingAmount: remainingAmount,
-                    confirmationTime: istTimestamp
-                };
-
-                const emailResult = await sendBookingConfirmationEmail(
-                    booking.users.email,
+                // Generate PDF invoice buffer
+                const pdfBuffer = await generateInvoiceBuffer(
+                    bookingId,
                     booking.users.full_name,
-                    bookingDetails
+                    booking.users.email,
+                    vehicle ? vehicle.name : 'Vehicle',
+                    duration,
+                    `${booking.start_date} ${booking.start_time}`,
+                    totalAmount,
+                    advancePayment
                 );
 
-                if (emailResult.success) {
-                    console.log('Booking confirmation email sent successfully');
-                } else {
-                    console.error('Failed to send booking confirmation email:', emailResult.error);
-                }
+                // Build Google Calendar link
+                const dayjs = require('dayjs');
+                const start = dayjs(`${booking.start_date}T${booking.start_time}`);
+                const end = start.add(duration, 'hour');
+                const formatForCal = (d) => {
+                    const iso = (new Date(d)).toISOString();
+                    return iso.replace(/[-:]/g, '').split('.')[0] + 'Z';
+                };
+                const gcalDates = `${formatForCal(start)}/${formatForCal(end)}`;
+                const gcalBase = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+                const gcalText = encodeURIComponent(`RentHub booking ${bookingId} — ${vehicle ? vehicle.name : 'Vehicle'}`);
+                const gcalDetails = encodeURIComponent(`Booking ID: ${bookingId}\nVehicle: ${vehicle ? vehicle.name : 'Vehicle'}\nPickup: ${booking.start_date} ${booking.start_time}`);
+                const gcalUrl = `${gcalBase}&text=${gcalText}&dates=${gcalDates}&details=${gcalDetails}`;
+
+                // Send email with PDF attachment
+                const { transporter } = require('./config/emailService');
+                const mailHtml = `
+                    <div style="font-family: Arial, sans-serif; color: #222;">
+                      <h2 style="color:#0b5cff;">Hello ${booking.users.full_name},</h2>
+                      <p>Your booking is confirmed! Please find your invoice attached.</p>
+                      <h3>Booking Details</h3>
+                      <table style="width:100%; border-collapse: collapse;">
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Booking ID</b></td><td style="padding:6px; border:1px solid #eee;">${bookingId}</td></tr>
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Vehicle</b></td><td style="padding:6px; border:1px solid #eee;">${vehicle ? vehicle.name : 'Vehicle'}</td></tr>
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Pickup Date & Time</b></td><td style="padding:6px; border:1px solid #eee;">${booking.start_date} ${booking.start_time}</td></tr>
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Duration</b></td><td style="padding:6px; border:1px solid #eee;">${duration} hours</td></tr>
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Total Amount</b></td><td style="padding:6px; border:1px solid #eee;">₹${totalAmount}</td></tr>
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Advance Paid</b></td><td style="padding:6px; border:1px solid #eee;">₹${advancePayment}</td></tr>
+                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Remaining Amount</b></td><td style="padding:6px; border:1px solid #eee;">₹${remainingAmount}</td></tr>
+                      </table>
+                      <p style="margin-top:12px;">
+                        <a href="${gcalUrl}" style="display:inline-block;padding:10px 14px;background:#0b5cff;color:#fff;border-radius:4px;text-decoration:none;">Add to Google Calendar</a>
+                      </p>
+                      <hr style="margin-top:18px;" />
+                      <p style="font-size:12px;color:#666;"><b>Pickup Instructions:</b> Please bring a valid ID and a printed or digital copy of this invoice. If you have any questions, call us.</p>
+                      <p style="font-size:12px;color:#666;">If you find this email in spam, please mark as <b>Not Spam</b> to ensure future delivery.</p>
+                      <footer style="margin-top:18px;padding-top:8px;border-top:1px solid #eee;color:#999;font-size:12px;">
+                        <div>RentHub — Bike & Vehicle Rentals</div>
+                        <div>support@renthub.example | +91 90000 00000</div>
+                        <div>123 RentHub Street, City, Country</div>
+                      </footer>
+                    </div>
+                `;
+
+                const mailOptions = {
+                    from: `"RentHub Booking" <${transporter.options.auth.user}>`,
+                    to: booking.users.email,
+                    subject: 'Booking Confirmed – RentHub',
+                    html: mailHtml,
+                    attachments: [
+                        { filename: 'booking_invoice.pdf', content: pdfBuffer }
+                    ]
+                };
+
+                await transporter.sendMail(mailOptions);
+                console.log('✅ Booking confirmation email with PDF sent successfully to:', booking.users.email);
             } catch (emailError) {
-                console.error('Error sending booking confirmation email:', emailError);
+                console.error('❌ Error sending booking confirmation email:', emailError);
                 // Don't fail the booking confirmation if email fails
             }
         }
