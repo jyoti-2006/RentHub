@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chat Button - RentHub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        /* Floating WhatsApp Button Styles */
+        .whatsapp-floating-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background-color: #25D366;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+            transition: all 0.3s ease;
+            z-index: 999;
+            text-decoration: none;
+            border: none;
+            outline: none;
+        }
+
+        .whatsapp-floating-btn:hover {
+            background-color: #1ead4f;
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(37, 211, 102, 0.6);
+        }
+
+        .whatsapp-floating-btn:active {
+            transform: scale(0.95);
+        }
+
+        .whatsapp-floating-btn svg {
+            width: 32px;
+            height: 32px;
+            fill: white;
+        }
+
+        /* Tooltip for the button */
+        .whatsapp-tooltip {
+            position: absolute;
+            bottom: 75px;
+            right: 0;
+            background-color: #25D366;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .whatsapp-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            right: 15px;
+            width: 10px;
+            height: 10px;
+            background-color: #25D366;
+            transform: rotate(45deg);
+        }
+
+        .whatsapp-floating-btn:hover .whatsapp-tooltip {
+            opacity: 1;
+            visibility: visible;
+            bottom: 80px;
+        }
+
+        /* Pulse animation */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 15px rgba(37, 211, 102, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(37, 211, 102, 0);
+            }
+        }
+
+        .whatsapp-floating-btn.pulse {
+            animation: pulse 2s infinite;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .whatsapp-floating-btn {
+                bottom: 20px;
+                right: 20px;
+                width: 55px;
+                height: 55px;
+            }
+
+            .whatsapp-floating-btn svg {
+                width: 28px;
+                height: 28px;
+            }
+
+            .whatsapp-tooltip {
+                display: none;
+            }
+        }
+
+        /* Demo content styles */
+        .feature-list {
+            text-align: left;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .feature-list li {
+            margin: 12px 0;
+            color: #555;
+            list-style: none;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .feature-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #25D366;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .info-box {
+            background-color: #f0f9f7;
+            border-left: 4px solid #25D366;
+            padding: 15px 20px;
+            margin-top: 20px;
+            border-radius: 4px;
+            text-align: left;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RentHub - WhatsApp Chat Integration</h1>
+        <p>Click the WhatsApp button in the bottom-right corner to start a conversation with us!</p>
+
+        <div class="feature-list">
+            <ul>
+                <li>Quick communication with RentHub team</li>
+                <li>Get available bikes and prices instantly</li>
+                <li>Learn about pickup points</li>
+                <li>Responsive and mobile-friendly</li>
+                <li>Pre-filled message for convenience</li>
+            </ul>
+        </div>
+
+        <div class="info-box">
+            <strong>💡 How to use:</strong><br>
+            Click the green WhatsApp button on the bottom-right. Your WhatsApp app (or WhatsApp Web) will open with a pre-written message ready to send. Just hit send to contact us!
+        </div>
+    </div>
+
+    <!-- Floating WhatsApp Button -->
+    <a href="https://wa.me/917077733320?text=Hello%20%F0%9F%91%8B%2C%20I%20want%20to%20rent%20a%20bike%20from%20RentHub.%20Please%20provide%20available%20bikes%2C%20prices%2C%20and%20pickup%20points." 
+       class="whatsapp-floating-btn pulse" 
+       target="_blank" 
+       rel="noopener noreferrer"
+       title="Chat with us on WhatsApp">
+        <div class="whatsapp-tooltip">Chat with us!</div>
+        <!-- WhatsApp SVG Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-5.031 1.378c-1.087.713-2.057 1.669-2.857 2.846C2.604 10.945 2 12.9 2 15.803c0 1.585.325 3.131.94 4.607l-1.007 3.71 3.786-1.023c1.31.703 2.788 1.075 4.297 1.075 2.923 0 5.646-1.19 7.678-3.095 2.032-1.905 3.268-4.49 3.268-7.286 0-1.047-.178-2.077-.526-3.078-.347-1-.847-1.947-1.48-2.821-.632-.874-1.368-1.613-2.187-2.191-.819-.579-1.708-.997-2.651-1.242-1.942-.493-4.015-.364-5.847.36m11.633-5.893h1.462v7.312h-1.462zm0 8.276h1.462v7.312h-1.462z"/>
+        </svg>
+    </a>
+
+    <script>
+        // Optional: Remove pulse animation after user interacts
+        const whatsappBtn = document.querySelector('.whatsapp-floating-btn');
+        
+        whatsappBtn.addEventListener('mouseenter', function() {
+            this.classList.remove('pulse');
+        });
+
+        // Re-add pulse if user leaves the page without clicking
+        window.addEventListener('beforeunload', function() {
+            whatsappBtn.classList.add('pulse');
+        });
+    </script>
+</body>
+</html>
