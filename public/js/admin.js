@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filtered.forEach(booking => {
             const row = document.createElement('tr');
+            row.setAttribute('data-booking-id', booking.id);
             const startDate = booking.start_date !== 'N/A' ? 
                 new Date(booking.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 
                 'N/A';
@@ -249,6 +250,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+
+        // Add SOS buttons for confirmed bookings
+        addSOSButtons();
+
+        // Add event listeners for SOS buttons
+        document.querySelectorAll('.btn-sos').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const bookingId = button.getAttribute('data-id');
+                if (confirm('Are you sure you want to send the SOS activation link to this user?')) {
+                    await sendSOSEmail(bookingId);
+                }
+            });
+        });
+
         // Add event listeners for reject buttons
         document.querySelectorAll('.btn-reject').forEach(button => {
             button.addEventListener('click', function() {
@@ -259,6 +274,55 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add event listeners for delete buttons
         attachDeleteListeners();
         attachActionListeners();
+    }
+
+    // Function to add SOS buttons for confirmed bookings
+    function addSOSButtons() {
+        allBookings.forEach(booking => {
+            if ((booking.status || '').toLowerCase() === 'confirmed') {
+                const bookingRow = document.querySelector(`tr[data-booking-id="${booking.id}"]`);
+                if (bookingRow) {
+                    const actionCell = bookingRow.querySelector('td:last-child');
+                    if (actionCell && !actionCell.querySelector('.btn-sos')) {
+                        const sosBtn = document.createElement('button');
+                        sosBtn.className = 'action-btn btn-sos';
+                        sosBtn.setAttribute('data-id', booking.id);
+                        sosBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> SOS';
+                        
+                        // Insert SOS button at the beginning of the action container
+                        const actionContainer = actionCell.querySelector('.action-buttons-container');
+                        if (actionContainer) {
+                            actionContainer.insertBefore(sosBtn, actionContainer.firstChild);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Function to send SOS email
+    async function sendSOSEmail(bookingId) {
+        try {
+            const response = await fetch('/api/admin/send-sos', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ bookingId: bookingId })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to send SOS');
+            }
+
+            const result = await response.json();
+            showMessage('success', result.message || 'SOS activation link sent successfully!');
+        } catch (error) {
+            console.error('Error sending SOS:', error);
+            showMessage('error', 'Failed to send SOS: ' + error.message);
+        }
     }
 
     // Attach filter event listeners

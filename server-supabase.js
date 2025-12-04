@@ -7,9 +7,10 @@ const compression = require('compression');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const SupabaseDB = require('./models/supabaseDB');
 const supabase = require('./config/supabase');
-const { sendBookingConfirmationEmail, sendPasswordResetOTP, sendRegistrationOTP, generateOTP } = require('./config/emailService');
+const { sendBookingConfirmationEmail, sendPasswordResetOTP, sendRegistrationOTP, generateOTP, sendSOSLinkEmail, sendSOSAlertEmail } = require('./config/emailService');
 const { makeBookingConfirmationCall } = require('./config/retellCallService');
 
 const app = express();
@@ -117,7 +118,7 @@ const generateInvoiceBuffer = async (bookingId, userName, userEmail, vehicleName
 
         // ===== HEADER =====
         doc.fillColor('#1e3a5f').rect(0, 0, pageWidth, 70).fill();
-        
+
         // Logo or placeholder
         if (logoPath) {
             try {
@@ -128,84 +129,84 @@ const generateInvoiceBuffer = async (bookingId, userName, userEmail, vehicleName
         } else {
             doc.fillColor('#00d084').rect(margin, 8, 50, 50).fill();
         }
-        
+
         // Header text
         doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('RentHub', margin + 60, 12);
         doc.fillColor('#00d084').fontSize(12).font('Helvetica').text('BOOKING INVOICE', margin + 60, 42);
-        
+
         doc.y = 80;
 
         // ===== CUSTOMER & INVOICE DETAILS =====
         doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').text('CUSTOMER & BOOKING DETAILS', margin);
         doc.moveDown(0.3);
-        
+
         // Gray background box for details
         const detailsY = doc.y;
         doc.fillColor('#f3f4f6').rect(margin, detailsY, contentWidth, 70).fill();
         doc.strokeColor('#e5e7eb').lineWidth(1).rect(margin, detailsY, contentWidth, 70).stroke();
-        
+
         // Left column
         doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Customer Name:', margin + 12, detailsY + 8);
         doc.fillColor('#000').fontSize(10).font('Helvetica').text(userName || 'N/A', margin + 12);
-        
+
         doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Email:', margin + 12);
         doc.fillColor('#000').fontSize(9).font('Helvetica').text(userEmail || 'N/A', margin + 12);
-        
+
         // Right column
         const rightColX = margin + (contentWidth / 2);
         doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Booking ID:', rightColX, detailsY + 8);
         doc.fillColor('#000').fontSize(10).font('Helvetica').text(bookingId || 'N/A', rightColX);
-        
+
         doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Vehicle:', rightColX);
         doc.fillColor('#000').fontSize(9).font('Helvetica').text(vehicleName || 'N/A', rightColX);
-        
+
         doc.y = detailsY + 75;
 
         // ===== BOOKING DETAILS =====
         doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').text('RENTAL DETAILS', margin);
         doc.moveDown(0.3);
-        
+
         const bookingDetailsY = doc.y;
         doc.fillColor('#f3f4f6').rect(margin, bookingDetailsY, contentWidth, 50).fill();
         doc.strokeColor('#e5e7eb').lineWidth(1).rect(margin, bookingDetailsY, contentWidth, 50).stroke();
-        
+
         doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Start Date & Time:', margin + 12, bookingDetailsY + 8);
         doc.fillColor('#000').fontSize(9).font('Helvetica').text(startDateTime || 'N/A', margin + 12);
-        
+
         doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold').text('Duration:', rightColX, bookingDetailsY + 8);
         doc.fillColor('#000').fontSize(9).font('Helvetica').text(`${duration} hours`, rightColX);
-        
+
         doc.y = bookingDetailsY + 55;
 
         // ===== AMOUNT BREAKDOWN =====
         doc.fillColor('#1f2937').fontSize(11).font('Helvetica-Bold').text('AMOUNT BREAKDOWN', margin);
         doc.moveDown(0.2);
-        
+
         const amountY = doc.y;
         doc.fillColor('#f3f4f6').rect(margin, amountY, contentWidth - 80, 75).fill();
         doc.strokeColor('#e5e7eb').lineWidth(1).rect(margin, amountY, contentWidth - 80, 75).stroke();
-        
+
         const labelX = margin + 12;
         const valueX = margin + contentWidth - 120;
         let lineY = amountY + 10;
-        
+
         // Total
         doc.fillColor('#374151').fontSize(10).font('Helvetica').text('Total Amount:', labelX, lineY);
         doc.fillColor('#1f2937').fontSize(10).font('Helvetica-Bold').text(`₹${totalAmount.toFixed(2)}`, valueX, lineY);
-        
+
         lineY += 18;
-        
+
         // Advance
         doc.fillColor('#374151').fontSize(10).font('Helvetica').text('Advance Paid:', labelX, lineY);
         doc.fillColor('#00a86b').fontSize(10).font('Helvetica-Bold').text(`₹${(advancePayment || 0).toFixed(2)}`, valueX, lineY);
-        
+
         lineY += 18;
-        
+
         // Remaining
         const remaining = (totalAmount || 0) - (advancePayment || 0);
         doc.fillColor('#374151').fontSize(10).font('Helvetica').text('Remaining:', labelX, lineY);
         doc.fillColor('#ff6b35').fontSize(10).font('Helvetica-Bold').text(`₹${remaining.toFixed(2)}`, valueX, lineY);
-        
+
         // QR Code - Right side of amount box
         try {
             const qrSize = 75;
@@ -215,51 +216,67 @@ const generateInvoiceBuffer = async (bookingId, userName, userEmail, vehicleName
         } catch (err) {
             console.warn('QR image error:', err.message);
         }
-        
+
         doc.y = amountY + 80;
 
         // ===== TERMS & CONDITIONS (Compact) =====
         doc.fillColor('#1f2937').fontSize(10).font('Helvetica-Bold').text('TERMS & CONDITIONS', margin);
         doc.moveDown(0.15);
-        
+
         const termsSections = [
-            { title: '1. Booking Confirmation', color: '#3b82f6', bgColor: '#eff6ff', titleColor: '#1e40af', items: [
-                'Advance booking confirmed after payment. Confirmation email will be sent.'
-            ] },
-            { title: '2. Advance Payment', color: '#10b981', bgColor: '#ecfdf5', titleColor: '#047857', items: [
-                'Minimum ₹100/- advance required. Remaining paid at pickup.'
-            ] },
-            { title: '3. Cancellation Policy', color: '#f59e0b', bgColor: '#fffbeb', titleColor: '#92400e', items: [
-                '2+ hrs before: Full refund. Within 2 hrs: 50% deducted.'
-            ] },
-            { title: '4. Required Documents', color: '#06b6d4', bgColor: '#ecfdf5', titleColor: '#0e7490', items: [
-                'Valid Aadhar Card required at pickup. Booking cancelled without valid documents.'
-            ] },
-            { title: '5. Bike Usage', color: '#ef4444', bgColor: '#fef2f2', titleColor: '#b91c1c', items: [
-                'Only registered renter can use. Sub-renting strictly prohibited.'
-            ] },
-            { title: '6. Late Return', color: '#f97316', bgColor: '#fff7ed', titleColor: '#c2410c', items: [
-                'Late return charges apply per hour beyond scheduled time.'
-            ] },
-            { title: '7. Refund Policy', color: '#10b981', bgColor: '#ecfdf5', titleColor: '#047857', items: [
-                'Refunds processed within 3-5 working days after cancellation.'
-            ] },
-            { title: '8. Company Rights', color: '#6b7280', bgColor: '#f9fafb', titleColor: '#374151', items: [
-                'Company may cancel due to unforeseen issues. Full refund provided.'
-            ] }
+            {
+                title: '1. Booking Confirmation', color: '#3b82f6', bgColor: '#eff6ff', titleColor: '#1e40af', items: [
+                    'Advance booking confirmed after payment. Confirmation email will be sent.'
+                ]
+            },
+            {
+                title: '2. Advance Payment', color: '#10b981', bgColor: '#ecfdf5', titleColor: '#047857', items: [
+                    'Minimum ₹100/- advance required. Remaining paid at pickup.'
+                ]
+            },
+            {
+                title: '3. Cancellation Policy', color: '#f59e0b', bgColor: '#fffbeb', titleColor: '#92400e', items: [
+                    '2+ hrs before: Full refund. Within 2 hrs: 50% deducted.'
+                ]
+            },
+            {
+                title: '4. Required Documents', color: '#06b6d4', bgColor: '#ecfdf5', titleColor: '#0e7490', items: [
+                    'Valid Aadhar Card required at pickup. Booking cancelled without valid documents.'
+                ]
+            },
+            {
+                title: '5. Bike Usage', color: '#ef4444', bgColor: '#fef2f2', titleColor: '#b91c1c', items: [
+                    'Only registered renter can use. Sub-renting strictly prohibited.'
+                ]
+            },
+            {
+                title: '6. Late Return', color: '#f97316', bgColor: '#fff7ed', titleColor: '#c2410c', items: [
+                    'Late return charges apply per hour beyond scheduled time.'
+                ]
+            },
+            {
+                title: '7. Refund Policy', color: '#10b981', bgColor: '#ecfdf5', titleColor: '#047857', items: [
+                    'Refunds processed within 3-5 working days after cancellation.'
+                ]
+            },
+            {
+                title: '8. Company Rights', color: '#6b7280', bgColor: '#f9fafb', titleColor: '#374151', items: [
+                    'Company may cancel due to unforeseen issues. Full refund provided.'
+                ]
+            }
         ];
-        
+
         let termsY = doc.y;
         for (const section of termsSections) {
             const sectionHeight = 24 + (section.items.length * 8);
-            
+
             // Background
             doc.fillColor(section.bgColor).rect(margin, termsY, contentWidth, sectionHeight).fill();
             doc.strokeColor(section.color).lineWidth(1).rect(margin, termsY, contentWidth, sectionHeight).stroke();
-            
+
             // Title
             doc.fillColor(section.titleColor).fontSize(7).font('Helvetica-Bold').text(section.title, margin + 6, termsY + 4);
-            
+
             // Items
             let itemY = termsY + 15;
             doc.fillColor('#374151').fontSize(6).font('Helvetica');
@@ -267,10 +284,10 @@ const generateInvoiceBuffer = async (bookingId, userName, userEmail, vehicleName
                 doc.text('• ' + item, margin + 10, itemY, { width: contentWidth - 18 });
                 itemY += 7;
             }
-            
+
             termsY = itemY + 3;
         }
-        
+
         doc.y = termsY;
 
         // ===== FOOTER =====
@@ -294,6 +311,11 @@ const generateInvoiceBuffer = async (bookingId, userName, userEmail, vehicleName
 // Root route - serve index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve SOS activation page
+app.get('/sos-activate', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sos-activate.html'));
 });
 
 // Middleware to verify user token
@@ -388,21 +410,21 @@ app.get('/api/admin/bookings', verifyAdminToken, async (req, res) => {
                     phone_number
                 )
             `);
-        
+
         if (error) throw error;
 
         // Get all vehicles
         const { data: bikes } = await supabase.from('bikes').select('*');
         const { data: cars } = await supabase.from('cars').select('*');
         const { data: scooty } = await supabase.from('scooty').select('*');
-        
+
         const allVehicles = [...(bikes || []), ...(cars || []), ...(scooty || [])];
 
         // Format the bookings data
         const enrichedBookings = bookings.map(booking => {
             // Find the vehicle
             const vehicle = allVehicles.find(v => v.id === booking.vehicle_id);
-            
+
             // Calculate amounts based on vehicle price and duration
             const duration = parseInt(booking.duration) || 0;
             const vehiclePrice = vehicle ? parseFloat(vehicle.price) || 0 : 0;
@@ -437,8 +459,8 @@ app.get('/api/admin/bookings', verifyAdminToken, async (req, res) => {
             };
         });
 
-        res.json({ 
-            data: enrichedBookings, 
+        res.json({
+            data: enrichedBookings,
             pagination: {
                 page: parseInt(req.query.page) || 1,
                 limit: parseInt(req.query.limit) || 20,
@@ -720,11 +742,11 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
         // Debug: Log the booking structure to understand data format
         console.log('📋 Booking data structure:', JSON.stringify(booking, null, 2));
         console.log('📋 Users data:', booking.users);
-        
+
         // Handle different possible data structures from Supabase
         let userPhoneNumber = null;
         let userName = 'Customer';
-        
+
         if (booking.users) {
             // Supabase might return users as an object or array
             if (Array.isArray(booking.users)) {
@@ -735,10 +757,10 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
                 userName = booking.users.full_name || 'Customer';
             }
         }
-        
+
         console.log('📞 Extracted phone number:', userPhoneNumber);
         console.log('👤 Extracted user name:', userName);
-        
+
         if (userPhoneNumber) {
             try {
                 const duration = parseInt(booking.duration) || 0;
@@ -799,7 +821,7 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
 app.post('/api/admin/bookings/:id/reject', verifyAdminToken, async (req, res) => {
     try {
         const bookingId = parseInt(req.params.id);
-        
+
         // First, fetch the booking without joins
         const { data: booking, error: fetchError } = await supabase
             .from('bookings')
@@ -843,7 +865,7 @@ app.post('/api/admin/bookings/:id/reject', verifyAdminToken, async (req, res) =>
         // Update booking status to rejected and save the reason, timestamps, and refund info
         const { error: updateError } = await supabase
             .from('bookings')
-            .update({ 
+            .update({
                 status: 'rejected',
                 rejection_reason: reason,
                 refund_status: 'processing',
@@ -862,7 +884,7 @@ app.post('/api/admin/bookings/:id/reject', verifyAdminToken, async (req, res) =>
             let vehicleTable = booking.vehicle_type;
             if (vehicleTable === 'car') vehicleTable = 'cars';
             if (vehicleTable === 'bike') vehicleTable = 'bikes';
-            
+
             const { error: vehicleError } = await supabase
                 .from(vehicleTable)
                 .update({ is_available: true })
@@ -881,7 +903,7 @@ app.post('/api/admin/bookings/:id/reject', verifyAdminToken, async (req, res) =>
                 .select('email, full_name, phone_number')
                 .eq('id', booking.user_id)
                 .single();
-                
+
             if (!userError) {
                 userData = user;
             }
@@ -893,13 +915,13 @@ app.post('/api/admin/bookings/:id/reject', verifyAdminToken, async (req, res) =>
             let vehicleTable = booking.vehicle_type;
             if (vehicleTable === 'car') vehicleTable = 'cars';
             if (vehicleTable === 'bike') vehicleTable = 'bikes';
-            
+
             const { data: vehicle, error: vehicleError } = await supabase
                 .from(vehicleTable)
                 .select('*')
                 .eq('id', booking.vehicle_id)
                 .single();
-                
+
             if (!vehicleError) {
                 vehicleData = vehicle;
             }
@@ -990,12 +1012,82 @@ app.post('/api/admin/bookings/:id/refund-complete', verifyAdminToken, async (req
     }
 });
 
+// SOS: Send activation link to user
+app.post('/api/admin/send-sos', verifyAdminToken, async (req, res) => {
+    try {
+        const { bookingId } = req.body;
+
+        // Fetch the booking with user details
+        const { data: booking, error: bookingError } = await supabase
+            .from('bookings')
+            .select('*, users:user_id(email, full_name, phone_number)')
+            .eq('id', bookingId)
+            .single();
+
+        if (bookingError || !booking) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+
+        // Check if booking is confirmed
+        if ((booking.status || '').toLowerCase() !== 'confirmed') {
+            return res.status(400).json({ error: 'SOS can only be sent for confirmed bookings' });
+        }
+
+        // Get user email
+        let userEmail = null;
+        let userName = 'User';
+        if (booking.users) {
+            if (Array.isArray(booking.users)) {
+                userEmail = booking.users[0]?.email;
+                userName = booking.users[0]?.full_name || 'User';
+            } else {
+                userEmail = booking.users.email;
+                userName = booking.users.full_name || 'User';
+            }
+        }
+
+        if (!userEmail) {
+            return res.status(404).json({ error: 'User email not found' });
+        }
+
+        // Generate unique SOS token
+        const sosToken = crypto.randomBytes(32).toString('hex');
+        const sosActivationLink = `${process.env.FRONTEND_URL || 'http://localhost:3005'}/sos-activate?token=${sosToken}&bookingId=${bookingId}`;
+
+        // Store SOS token in a simple variable/cache (since DB columns don't exist)
+        // In production, you'd want to store this in a separate SOS_tokens table or cache like Redis
+        if (!global.sosTokens) {
+            global.sosTokens = {};
+        }
+        global.sosTokens[sosToken] = {
+            bookingId,
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+        };
+
+        // Send SOS link email to user
+        const emailResult = await sendSOSLinkEmail(userEmail, userName, sosActivationLink);
+
+        if (!emailResult.success) {
+            return res.status(500).json({ error: 'Failed to send email: ' + emailResult.error });
+        }
+
+        res.json({
+            success: true,
+            message: 'SOS activation link sent to ' + userEmail
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error sending SOS: ' + error.message });
+    }
+});
+
+
 // Admin: Cancel booking
 app.post('/api/admin/bookings/:id/cancel', verifyAdminToken, async (req, res) => {
     try {
         const bookingId = parseInt(req.params.id);
         console.log('Processing booking cancellation for ID:', bookingId);
-        
+
         // First, fetch the booking
         const { data: booking, error: fetchError } = await supabase
             .from('bookings')
@@ -1020,7 +1112,7 @@ app.post('/api/admin/bookings/:id/cancel', verifyAdminToken, async (req, res) =>
         const now = new Date();
         const confirmationTime = booking.confirmation_timestamp ? new Date(booking.confirmation_timestamp) : now;
         const hoursSinceConfirmation = (now - confirmationTime) / (1000 * 60 * 60);
-        
+
         console.log('Booking cancellation debug:', {
             confirmation_timestamp: booking.confirmation_timestamp,
             now: new Date().toISOString(),
@@ -1056,7 +1148,7 @@ app.post('/api/admin/bookings/:id/cancel', verifyAdminToken, async (req, res) =>
         // Update booking status to cancelled with refund details, timestamps, and deduction
         const { data: updatedBooking, error: updateError } = await supabase
             .from('bookings')
-            .update({ 
+            .update({
                 status: 'cancelled',
                 refund_amount: refundAmount,
                 refund_status: 'processing',
@@ -1199,7 +1291,7 @@ app.post('/api/register/send-otp', async (req, res) => {
 app.post('/api/register/user', async (req, res) => {
     try {
         const { fullName, email, phoneNumber, password, confirmPassword, otp } = req.body;
-        
+
         // Check if user exists
         const existingUser = await SupabaseDB.getUserByEmail(email);
         if (existingUser) {
@@ -1313,14 +1405,14 @@ app.get('/api/debug/user/:email', async (req, res) => {
     try {
         const { email } = req.params;
         console.log('🔍 Debug: Checking user data for email:', email);
-        
+
         const user = await SupabaseDB.getUserByEmail(email);
         console.log('📊 Debug: Raw user data:', user);
-        
+
         if (!user) {
             return res.json({ error: 'User not found', email });
         }
-        
+
         // Show both raw and mapped data
         const mappedUser = {
             id: user.id,
@@ -1330,7 +1422,7 @@ app.get('/api/debug/user/:email', async (req, res) => {
             phoneNumber: user.phone_number,
             isAdmin: user.is_admin || false
         };
-        
+
         res.json({
             raw: user,
             mapped: mappedUser,
@@ -1352,7 +1444,7 @@ app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         console.log('🔍 Login attempt for email:', email);
-        
+
         const user = await SupabaseDB.getUserByEmail(email);
         console.log('📊 Raw user data from Supabase:', user);
 
@@ -1381,7 +1473,7 @@ app.post('/api/login', async (req, res) => {
             phoneNumber: user.phone_number,
             isAdmin: user.is_admin || false
         };
-        
+
         console.log('🎯 Mapped user response:', userResponse);
         console.log('✅ Login successful for:', userResponse.fullName || userResponse.adminName || userResponse.email);
 
@@ -1409,7 +1501,7 @@ app.post('/api/login/admin', async (req, res) => {
             { id: admin.id, email: admin.email, isAdmin: admin.is_admin },
             JWT_SECRET
         );
-        
+
         // Map snake_case to camelCase for frontend compatibility
         const adminResponse = {
             id: admin.id,
@@ -1420,7 +1512,7 @@ app.post('/api/login/admin', async (req, res) => {
             adminId: admin.admin_id,
             isAdmin: admin.is_admin || false
         };
-        
+
         res.json({ token, admin: adminResponse });
     } catch (error) {
         console.error('Error during admin login:', error);
@@ -1757,7 +1849,7 @@ app.post('/api/bookings/:id/cancel', verifyToken, async (req, res) => {
         const bookingId = parseInt(req.params.id);
         const userId = req.user.id;
         console.log('Processing user booking cancellation for ID:', bookingId);
-        
+
         // First, fetch the booking
         const { data: booking, error: fetchError } = await supabase
             .from('bookings')
@@ -1783,7 +1875,7 @@ app.post('/api/bookings/:id/cancel', verifyToken, async (req, res) => {
         const now = new Date();
         const confirmationTime = booking.confirmation_timestamp ? new Date(booking.confirmation_timestamp) : now;
         const hoursSinceConfirmation = (now - confirmationTime) / (1000 * 60 * 60);
-        
+
         console.log('Booking cancellation debug:', {
             confirmation_timestamp: booking.confirmation_timestamp,
             now: new Date().toISOString(),
@@ -1819,7 +1911,7 @@ app.post('/api/bookings/:id/cancel', verifyToken, async (req, res) => {
         // Update booking status to cancelled with refund details, timestamps, and deduction
         const { data: updatedBooking, error: updateError } = await supabase
             .from('bookings')
-            .update({ 
+            .update({
                 status: 'cancelled',
                 refund_amount: refundAmount,
                 refund_status: 'processing',
@@ -1900,7 +1992,7 @@ app.post('/api/bookings/:id/refund-details', verifyToken, async (req, res) => {
         // Update the booking with refund details, refund amount, and set refund_status to 'processing'
         const { data: updatedBooking, error: updateError } = await supabase
             .from('bookings')
-            .update({ 
+            .update({
                 refund_details: req.body.refundDetails,
                 refund_amount: advancePayment,
                 refund_status: 'processing',
@@ -1926,7 +2018,7 @@ app.post('/api/bookings/:id/refund-details', verifyToken, async (req, res) => {
 app.post('/api/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
         }
@@ -2052,7 +2144,7 @@ app.post('/api/admin/forgot-password', async (req, res) => {
 app.post('/api/reset-password', async (req, res) => {
     try {
         const { email, otp, newPassword } = req.body;
-        
+
         if (!email || !otp) {
             return res.status(400).json({ error: 'Email and OTP are required' });
         }
@@ -2135,7 +2227,7 @@ app.post('/api/reset-password', async (req, res) => {
 app.post('/api/test/retell-call', verifyAdminToken, async (req, res) => {
     try {
         const { phoneNumber } = req.body;
-        
+
         if (!phoneNumber) {
             return res.status(400).json({ error: 'Phone number is required' });
         }
@@ -2223,15 +2315,146 @@ app.get('/debug/supabase', async (req, res) => {
         // Provide helpful diagnostic info without returning secret values
         return res.status(500).json({
             success: false,
-            supabaseUrl: supabaseUrl ? 'Set' : 'Not set',
-            anonKey: anonSet ? 'Set' : 'Not set',
-            serviceRoleKey: serviceRoleSet ? 'Set' : 'Not set',
-            error: err.message
+
         });
     }
 });
 
+// SOS Activation Endpoint
+app.post('/api/sos-activate', async (req, res) => {
+    try {
+        const { token, bookingId, gpsLocation } = req.body;
+
+        // Basic validation
+        if (!bookingId) {
+            return res.status(400).json({ error: 'Booking ID is required' });
+        }
+
+        // Fetch booking details with user info
+        const { data: booking, error: bookingError } = await supabase
+            .from('bookings')
+            .select(`
+                *,
+                users:user_id (
+                    full_name,
+                    email,
+                    phone_number
+                )
+            `)
+            .eq('id', bookingId)
+            .single();
+
+        if (bookingError || !booking) {
+            console.error('Error fetching booking for SOS:', bookingError);
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+
+        // Get vehicle details
+        let vehicleName = 'Unknown Vehicle';
+
+        // First, try to get vehicle name directly from booking if it exists
+        if (booking.vehicle_name) {
+            vehicleName = booking.vehicle_name;
+            console.log('Vehicle name from booking:', vehicleName);
+        } else if (booking.vehicle_type && booking.vehicle_id) {
+            // Try to fetch from vehicle tables
+            console.log('Fetching vehicle from DB - Type:', booking.vehicle_type, 'ID:', booking.vehicle_id);
+
+            // Determine correct table name
+            let tableName;
+            if (booking.vehicle_type === 'scooty') {
+                tableName = 'scooty'; // or 'scooties' depending on your schema
+            } else if (booking.vehicle_type === 'bike') {
+                tableName = 'bikes';
+            } else {
+                tableName = booking.vehicle_type + 's'; // Generic pluralization
+            }
+
+            console.log('Querying table:', tableName);
+
+            const { data: vehicle, error: vehicleError } = await supabase
+                .from(tableName)
+                .select('name, model')
+                .eq('id', booking.vehicle_id)
+                .single();
+
+            if (vehicleError) {
+                console.error('Error fetching vehicle:', vehicleError);
+                // Try alternative table name if first attempt fails
+                if (tableName === 'scooty') {
+                    const { data: altVehicle } = await supabase
+                        .from('scooties')
+                        .select('name, model')
+                        .eq('id', booking.vehicle_id)
+                        .single();
+                    if (altVehicle) {
+                        vehicleName = altVehicle.name || altVehicle.model || 'Unknown Vehicle';
+                        console.log('Vehicle found in scooties table:', vehicleName);
+                    }
+                }
+            } else if (vehicle) {
+                vehicleName = vehicle.name || vehicle.model || 'Unknown Vehicle';
+                console.log('Vehicle found:', vehicleName);
+            }
+        } else {
+            console.log('No vehicle_type or vehicle_id in booking');
+        }
+
+
+        // Prepare SOS data
+        let gpsString = 'Not Provided';
+        let googleMapsLink = null;
+
+        if (gpsLocation && typeof gpsLocation === 'object') {
+            const { latitude, longitude, accuracy } = gpsLocation;
+            gpsString = `Lat: ${latitude}, Lng: ${longitude} (Accuracy: ${accuracy}m)`;
+            googleMapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        } else if (typeof gpsLocation === 'string') {
+            gpsString = gpsLocation;
+        }
+
+        const sosData = {
+            bookingId: booking.id,
+            userName: booking.users?.full_name || 'Unknown User',
+            userEmail: booking.users?.email || 'Unknown Email',
+            phoneNumber: booking.users?.phone_number || 'Unknown Phone',
+            bikeModel: vehicleName,
+            pickupLocation: booking.pickup_location || 'GITA Autonomous College BBSR',
+            timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            gpsLocation: gpsString,
+            googleMapsLink: googleMapsLink
+        };
+
+        // Fetch all admins from database
+        const { data: admins, error: adminError } = await supabase
+            .from('users')
+            .select('email')
+            .eq('is_admin', true);
+
+        if (adminError) {
+            console.error('Error fetching admins:', adminError);
+            // Fallback to hardcoded email if DB fetch fails
+            await sendSOSAlertEmail(ADMIN_EMAILS[0], sosData);
+        } else if (admins && admins.length > 0) {
+            // Send email to all admins
+            const emailPromises = admins.map(admin => sendSOSAlertEmail(admin.email, sosData));
+            await Promise.all(emailPromises);
+        } else {
+            console.warn('No admins found in database. Sending to fallback.');
+            await sendSOSAlertEmail(ADMIN_EMAILS[0], sosData);
+        }
+
+        // Send response immediately, emails sent in background (or awaited above)
+        res.json({ success: true, message: 'SOS alert sent successfully' });
+
+    } catch (error) {
+        console.error('Error processing SOS request:', error);
+        res.status(500).json({ error: 'Internal server error processing SOS' });
+    }
+});
+
+// Start the server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Email test endpoint: http://localhost:${PORT}/test-email`);
-}); 
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});

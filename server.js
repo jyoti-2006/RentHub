@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendSOSLinkEmail, sendSOSAlertEmail } = require('./config/emailService');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -251,6 +253,142 @@ app.get('/api/admin/dashboard', authenticateToken, adminOnly, (req, res) => {
         res.json(dashboardData);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching dashboard data' });
+    }
+});
+
+// SOS Routes
+// Send SOS activation link to user
+app.post('/api/admin/send-sos', authenticateToken, adminOnly, async (req, res) => {
+    try {
+        const { bookingId } = req.body;
+        
+        // Read bookings and users
+        const bookingsPath = path.join(DATA_DIR, 'bookings.json');
+        const usersPath = path.join(DATA_DIR, 'users.json');
+        
+        const bookings = JSON.parse(fs.readFileSync(bookingsPath, 'utf8'));
+        const users = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+        
+        // Find the booking
+        const booking = bookings.find(b => b.id == bookingId);
+        if (!booking) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+        
+        // Check if booking is confirmed
+        if ((booking.status || '').toLowerCase() !== 'confirmed') {
+            return res.status(400).json({ error: 'SOS can only be sent for confirmed bookings' });
+        }
+        
+        // Find the user
+        const user = users.find(u => u.email === booking.customerEmail);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Generate unique SOS token
+        const sosToken = crypto.randomBytes(32).toString('hex');
+        const sosActivationLink = `${process.env.FRONTEND_URL || 'http://localhost:3002'}/sos-activate?token=${sosToken}&bookingId=${bookingId}`;
+        
+        // Store SOS token in booking (optional - for verification)
+        booking.sosToken = sosToken;
+        booking.sosTokenCreatedAt = new Date().toISOString();
+        fs.writeFileSync(bookingsPath, JSON.stringify(bookings, null, 2));
+        
+        // Send SOS link email to user
+        const emailResult = await sendSOSLinkEmail(
+            booking.customerEmail,
+            booking.customerName,
+            sosActivationLink
+        );
+        
+        if (!emailResult.success) {
+            return res.status(500).json({ error: 'Failed to send email: ' + emailResult.error });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'SOS activation link sent to ' + booking.customerEmail 
+        });
+    } catch (error) {
+        console.error('Error sending SOS:', error);
+        res.status(500).json({ error: 'Error sending SOS: ' + error.message });
+    }
+});
+
+// SOS activation endpoint - receives alert from user clicking the link
+app.post('/api/sos-activate', async (req, res) => {
+    try {
+        const { token, bookingId, gpsLocation } = req.body;
+        
+        // Read bookings and users
+        const bookingsPath = path.join(DATA_DIR, 'bookings.json');
+        const usersPath = path.join(DATA_DIR, 'users.json');
+        
+        const bookings = JSON.parse(fs.readFileSync(bookingsPath, 'utf8'));
+        const users = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+        
+        // Find the booking
+        const booking = bookings.find(b => b.id == bookingId);
+        if (!booking) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+        
+        // Verify SOS token (optional security check)
+        if (booking.sosToken && booking.sosToken !== token) {
+            return res.status(401).json({ error: 'Invalid SOS token' });
+        }
+        
+        // Find the user
+        const user = users.find(u => u.email === booking.customerEmail);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Find admin email (assuming first admin user or from environment)
+        const adminUser = users.find(u => u.isAdmin);
+        const adminEmail = adminUser ? adminUser.email : (process.env.ADMIN_EMAIL || 'admin@renthub.com');
+        
+        // Prepare SOS alert data
+        const sosData = {
+            bookingId: booking.id,
+            userName: booking.customerName,
+            phoneNumber: user.phone || booking.customerPhone || 'N/A',
+            userEmail: booking.customerEmail,
+            bikeModel: booking.vehicleName,
+            pickupLocation: booking.pickup_location || 'N/A',
+            gpsLocation: gpsLocation || 'Not provided',
+            timestamp: new Date().toLocaleString('en-IN', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true 
+            })
+        };
+        
+        // Send SOS alert email to admin
+        const emailResult = await sendSOSAlertEmail(adminEmail, sosData);
+        
+        if (!emailResult.success) {
+            return res.status(500).json({ error: 'Failed to send alert: ' + emailResult.error });
+        }
+        
+        // Log SOS activation in booking
+        booking.sosActivated = true;
+        booking.sosActivationTime = new Date().toISOString();
+        booking.sosDetails = sosData;
+        fs.writeFileSync(bookingsPath, JSON.stringify(bookings, null, 2));
+        
+        res.json({ 
+            success: true, 
+            message: 'SOS alert sent to admin. Help is on the way!' 
+        });
+    } catch (error) {
+        console.error('Error activating SOS:', error);
+        res.status(500).json({ error: 'Error activating SOS: ' + error.message });
     }
 });
 

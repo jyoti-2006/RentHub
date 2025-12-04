@@ -174,11 +174,119 @@ async function sendRefundCompleteEmail(userEmail, userName, bookingId, amount, r
     }
 }
 
+// Send SOS activation link email to user
+async function sendSOSLinkEmail(userEmail, userName, sosLink) {
+    try {
+        const mailOptions = {
+            from: '"RentHub SOS" <' + transporterConfig.auth.user + '>',
+            to: userEmail,
+            subject: 'SOS Activation for Your Ride - RentHub',
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                  <h2>Hello${userName ? ', ' + userName : ''}!</h2>
+                  <p>We want to ensure your safety during your ride. You can now activate the <b>SOS feature</b> for your current booking.</p>
+                  <p style="margin: 20px 0;">
+                    <a href="${sosLink}" style="
+                      display: inline-block;
+                      background-color: #dc143c;
+                      color: white;
+                      padding: 12px 24px;
+                      text-decoration: none;
+                      border-radius: 4px;
+                      font-weight: bold;
+                      font-size: 1.1em;
+                    ">Activate SOS</a>
+                  </p>
+                  <p><b>How SOS Works:</b></p>
+                  <ul>
+                    <li>Click the "Activate SOS" button above to confirm that you need assistance.</li>
+                    <li>Our admin team will be notified immediately with your booking and location details.</li>
+                    <li>We will contact you at your registered phone number to provide assistance.</li>
+                  </ul>
+                  <p style="color: #666; margin-top: 20px;">If you did not expect this email or don't need SOS assistance, you can safely ignore it.</p>
+                  <br>
+                  <p>Stay safe!<br>The RentHub Team</p>
+                  <hr>
+                  <small>If you find this email in your spam folder, please mark it as 'Not Spam' to help us deliver future emails to your inbox.</small>
+                </div>
+            `
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        console.log('SOS activation link email sent successfully:', result.messageId);
+        return { success: true, messageId: result.messageId };
+    } catch (error) {
+        console.error('Error sending SOS link email:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Send SOS alert email to admin
+async function sendSOSAlertEmail(adminEmail, sosData) {
+    try {
+        const mailOptions = {
+            from: '"RentHub SOS Alert" <' + transporterConfig.auth.user + '>',
+            to: adminEmail,
+            subject: 'URGENT: SOS Alert from User - RentHub',
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #222; background-color: #fff3cd; padding: 20px; border-left: 4px solid #dc143c;">
+                  <h2 style="color: #dc143c;">⚠️ SOS ALERT - IMMEDIATE ATTENTION REQUIRED ⚠️</h2>
+                  <hr>
+                  <h3>Booking Information:</h3>
+                  <ul>
+                    <li><b>Booking ID:</b> ${sosData.bookingId}</li>
+                    <li><b>User Name:</b> ${sosData.userName}</li>
+                    <li><b>Phone Number:</b> ${sosData.phoneNumber}</li>
+                    <li><b>Email:</b> ${sosData.userEmail}</li>
+                  </ul>
+                  <h3>Vehicle Information:</h3>
+                  <ul>
+                    <li><b>Bike/Vehicle Model:</b> ${sosData.bikeModel}</li>
+                    <li><b>Pickup Location:</b> ${sosData.pickupLocation}</li>
+                  </ul>
+                  <h3>SOS Details:</h3>
+                  <ul>
+                    <li><b>Activation Timestamp:</b> ${sosData.timestamp}</li>
+                    <li><b>GPS Location:</b> ${sosData.gpsLocation}</li>
+                    ${sosData.googleMapsLink ? `
+                    <li style="margin-top: 10px;">
+                        <a href="${sosData.googleMapsLink}" target="_blank" style="
+                            background-color: #4285F4;
+                            color: white;
+                            padding: 8px 16px;
+                            text-decoration: none;
+                            border-radius: 4px;
+                            display: inline-block;
+                            font-weight: bold;
+                        ">📍 View on Google Maps</a>
+                    </li>
+                    ` : ''}
+                  </ul>
+                  <hr>
+                  <p style="color: #dc143c; font-weight: bold; font-size: 1.1em;">Please contact the user immediately at the provided phone number.</p>
+                  <p>Log into your admin panel to view full booking details and take necessary action.</p>
+                  <br>
+                  <p>RentHub Admin System</p>
+                </div>
+            `
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        console.log('SOS alert email sent to admin successfully:', result.messageId);
+        return { success: true, messageId: result.messageId };
+    } catch (error) {
+        console.error('Error sending SOS alert email:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     generateOTP,
     sendBookingConfirmationEmail,
     sendPasswordResetOTP,
     sendRegistrationOTP,
     sendRefundCompleteEmail,
+    sendSOSLinkEmail,
+    sendSOSAlertEmail,
     transporter
 };

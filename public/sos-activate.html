@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS Activation - RentHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .sos-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .sos-header {
+            margin-bottom: 30px;
+        }
+
+        .sos-icon {
+            font-size: 4rem;
+            color: #dc143c;
+            margin-bottom: 15px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .status-message {
+            color: #666;
+            font-size: 1rem;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .status-message.success {
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        .status-message.error {
+            color: #dc143c;
+            font-weight: 500;
+        }
+
+        .status-message.loading {
+            color: #667eea;
+        }
+
+        .booking-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .booking-info h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            color: #555;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .info-value {
+            color: #666;
+            word-break: break-word;
+        }
+
+        .buttons-container {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-activate {
+            background-color: #dc143c;
+            color: white;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .btn-activate:hover:not(:disabled) {
+            background-color: #8b0000;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 20, 60, 0.3);
+        }
+
+        .btn-activate:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-cancel {
+            background-color: #e0e0e0;
+            color: #333;
+            min-width: 150px;
+        }
+
+        .btn-cancel:hover {
+            background-color: #bbb;
+            transform: translateY(-2px);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #dc143c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            text-align: left;
+            color: #856404;
+        }
+
+        .warning-box strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .success-box {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #155724;
+        }
+
+        .error-box {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc143c;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #721c24;
+        }
+
+        .location-note {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #e7f3ff;
+            border-radius: 4px;
+            border-left: 3px solid #2196F3;
+        }
+
+        @media (max-width: 600px) {
+            .sos-container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .sos-icon {
+                font-size: 3rem;
+            }
+
+            .buttons-container {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .btn-activate {
+                min-width: unset;
+            }
+
+            .btn-cancel {
+                min-width: unset;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sos-container">
+        <div class="sos-header">
+            <div class="sos-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h1>SOS Activation</h1>
+        </div>
+
+        <div id="content">
+            <p class="status-message loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading booking details...
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const sosToken = urlParams.get('token');
+        const bookingId = urlParams.get('bookingId');
+
+        // Load and display booking details
+        async function loadBookingDetails() {
+            const contentDiv = document.getElementById('content');
+
+            // Basic validation
+            if (!sosToken || !bookingId) {
+                contentDiv.innerHTML = `
+                    <div class="error-box">
+                        <strong>Invalid SOS Link</strong>
+                        <p>The SOS activation link is invalid or has expired. Please check your email and try again.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                // Note: In a real implementation, you would fetch booking details from the server
+                // For now, we'll show the activation form
+                contentDiv.innerHTML = `
+                    <p class="status-message">Ready to activate SOS assistance</p>
+                    <div class="warning-box">
+                        <strong>⚠️ Important</strong>
+                        <p>By clicking "Activate SOS", you're requesting immediate assistance. Our team will contact you shortly at your registered phone number.</p>
+                    </div>
+                    <div class="booking-info">
+                        <h3>Your Details</h3>
+                        <div class="info-item">
+                            <span class="info-label">Booking ID:</span>
+                            <span class="info-value">${bookingId}</span>
+                        </div>
+                    </div>
+                    <div class="location-note">
+                        <strong>📍 Location Service:</strong> Enabling location will help us reach you faster. Your location will only be used for this SOS request.
+                    </div>
+                    <div class="buttons-container">
+                        <button class="btn btn-activate" id="activate-btn" onclick="activateSOS()">
+                            <i class="fas fa-phone"></i> Activate SOS
+                        </button>
+                        <button class="btn btn-cancel" onclick="window.history.back()">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                contentDiv.innerHTML = `
+                    <div class="error-box">
+                        <strong>Error</strong>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Activate SOS with improved location accuracy
+        async function activateSOS() {
+            const activateBtn = document.getElementById('activate-btn');
+            activateBtn.disabled = true;
+            const originalText = activateBtn.innerHTML;
+            activateBtn.innerHTML = '<div class="spinner"></div> Activating...';
+
+            try {
+                // Get GPS location if available
+                let gpsLocation = null;
+                if (navigator.geolocation) {
+                    try {
+                        // Show status message
+                        activateBtn.innerHTML = '<div class="spinner"></div> Getting precise location...';
+
+                        // Try to get high accuracy location with retry logic
+                        let position = null;
+                        let attempts = 0;
+                        const maxAttempts = 3;
+
+                        while (attempts < maxAttempts) {
+                            attempts++;
+                            try {
+                                position = await new Promise((resolve, reject) => {
+                                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                        timeout: 30000, // 30 seconds for high accuracy
+                                        enableHighAccuracy: true,
+                                        maximumAge: 0 // Force fresh location
+                                    });
+                                });
+
+                                // If accuracy is good (less than 100 meters), use it
+                                if (position.coords.accuracy <= 100) {
+                                    console.log(`Got accurate location: ${position.coords.accuracy}m accuracy`);
+                                    break;
+                                } else if (attempts < maxAttempts) {
+                                    console.log(`Accuracy ${position.coords.accuracy}m, retrying... (${attempts}/${maxAttempts})`);
+                                    activateBtn.innerHTML = `<div class="spinner"></div> Improving accuracy... (${attempts}/${maxAttempts})`;
+                                    // Wait a bit before retrying
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                }
+                            } catch (err) {
+                                if (attempts === maxAttempts) {
+                                    throw err;
+                                }
+                                console.log(`Location attempt ${attempts} failed, retrying...`);
+                            }
+                        }
+
+                        if (position) {
+                            // Send structured data
+                            gpsLocation = {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            };
+                            console.log('Final GPS location:', gpsLocation);
+                        }
+                    } catch (locError) {
+                        console.log('GPS location not available:', locError.message);
+                        activateBtn.innerHTML = '<div class="spinner"></div> Activating without GPS...';
+                        // Continue without GPS location
+                    }
+                }
+
+                // Send SOS activation request
+                activateBtn.innerHTML = '<div class="spinner"></div> Sending alert...';
+                const response = await fetch('/api/sos-activate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: sosToken,
+                        bookingId: bookingId,
+                        gpsLocation: gpsLocation
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to activate SOS');
+                }
+
+                const result = await response.json();
+
+                // Show success message
+                const contentDiv = document.getElementById('content');
+                contentDiv.innerHTML = `
+                    <div class="success-box">
+                        <strong>✓ SOS Activated Successfully!</strong>
+                        <p>Our team has been notified and will contact you shortly at your registered phone number.</p>
+                        ${gpsLocation ? `<p style="font-size: 0.9em; color: #666; margin-top: 10px;">📍 Location shared with accuracy: ${Math.round(gpsLocation.accuracy)}m</p>` : ''}
+                    </div>
+                    <div class="booking-info">
+                        <h3>What Happens Next?</h3>
+                        <div class="info-item">
+                            <span class="info-label">1.</span>
+                            <span class="info-value">Admin will receive alert immediately</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">2.</span>
+                            <span class="info-value">We will call you at your registered number</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">3.</span>
+                            <span class="info-value">Assistance will be provided based on your needs</span>
+                        </div>
+                    </div>
+                    <div class="buttons-container">
+                        <button class="btn btn-cancel" onclick="window.close()">
+                            <i class="fas fa-home"></i> Close
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                activateBtn.disabled = false;
+                activateBtn.innerHTML = originalText;
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Load details on page load
+        loadBookingDetails();
+    </script>
+</body>
+
+</html>
