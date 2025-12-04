@@ -2,20 +2,19 @@ services:
   - type: web
     name: renthub
     env: node
+    plan: free
     buildCommand: npm install
     startCommand: node server-supabase.js
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: EMAIL_USER
-        sync: false
-      - key: EMAIL_PASS
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true 
+      - key: PORT
+        value: 3005
+      # Add these via Render Dashboard (sensitive values):
+      # - SUPABASE_URL
+      # - SUPABASE_ANON_KEY
+      # - SUPABASE_SERVICE_ROLE_KEY
+      # - JWT_SECRET
+      # - EMAIL_USER
+      # - EMAIL_PASS
