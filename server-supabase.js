@@ -655,162 +655,152 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
             return res.status(500).json({ error: 'Error updating booking status' });
         }
 
-        // Send email notification with PDF invoice attached
-        if (booking.users?.email && booking.users?.full_name) {
-            try {
-                const duration = parseInt(booking.duration) || 0;
-                const vehiclePrice = vehicle ? parseFloat(vehicle.price) || 0 : 0;
-                const totalAmount = duration * vehiclePrice;
-                const advancePayment = parseFloat(booking.advance_payment) || 100;
-                const remainingAmount = totalAmount - advancePayment;
-
-                // Generate PDF invoice buffer
-                const pdfBuffer = await generateInvoiceBuffer(
-                    bookingId,
-                    booking.users.full_name,
-                    booking.users.email,
-                    vehicle ? vehicle.name : 'Vehicle',
-                    duration,
-                    `${booking.start_date} ${booking.start_time}`,
-                    totalAmount,
-                    advancePayment
-                );
-
-                // Build Google Calendar link
-                const dayjs = require('dayjs');
-                const start = dayjs(`${booking.start_date}T${booking.start_time}`);
-                const end = start.add(duration, 'hour');
-                const formatForCal = (d) => {
-                    const iso = (new Date(d)).toISOString();
-                    return iso.replace(/[-:]/g, '').split('.')[0] + 'Z';
-                };
-                const gcalDates = `${formatForCal(start)}/${formatForCal(end)}`;
-                const gcalBase = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-                const gcalText = encodeURIComponent(`RentHub booking ${bookingId} — ${vehicle ? vehicle.name : 'Vehicle'}`);
-                const gcalDetails = encodeURIComponent(`Booking ID: ${bookingId}\nVehicle: ${vehicle ? vehicle.name : 'Vehicle'}\nPickup: ${booking.start_date} ${booking.start_time}`);
-                const gcalUrl = `${gcalBase}&text=${gcalText}&dates=${gcalDates}&details=${gcalDetails}`;
-
-                // Send email with PDF attachment
-                const { transporter } = require('./config/emailService');
-                const mailHtml = `
-                    <div style="font-family: Arial, sans-serif; color: #222;">
-                      <h2 style="color:#0b5cff;">Hello ${booking.users.full_name},</h2>
-                      <p>Your booking is confirmed! Please find your invoice attached.</p>
-                      <h3>Booking Details</h3>
-                      <table style="width:100%; border-collapse: collapse;">
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Booking ID</b></td><td style="padding:6px; border:1px solid #eee;">${bookingId}</td></tr>
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Vehicle</b></td><td style="padding:6px; border:1px solid #eee;">${vehicle ? vehicle.name : 'Vehicle'}</td></tr>
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Pickup Date & Time</b></td><td style="padding:6px; border:1px solid #eee;">${booking.start_date} ${booking.start_time}</td></tr>
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Duration</b></td><td style="padding:6px; border:1px solid #eee;">${duration} hours</td></tr>
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Total Amount</b></td><td style="padding:6px; border:1px solid #eee;">₹${totalAmount}</td></tr>
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Advance Paid</b></td><td style="padding:6px; border:1px solid #eee;">₹${advancePayment}</td></tr>
-                        <tr><td style="padding:6px; border:1px solid #eee;"><b>Remaining Amount</b></td><td style="padding:6px; border:1px solid #eee;">₹${remainingAmount}</td></tr>
-                      </table>
-                      <p style="margin-top:12px;">
-                        <a href="${gcalUrl}" style="display:inline-block;padding:10px 14px;background:#0b5cff;color:#fff;border-radius:4px;text-decoration:none;">Add to Google Calendar</a>
-                      </p>
-                      <hr style="margin-top:18px;" />
-                      <p style="font-size:12px;color:#666;"><b>Pickup Instructions:</b> Please bring a valid ID and a printed or digital copy of this invoice. If you have any questions, call us.</p>
-                      <p style="font-size:12px;color:#666;">If you find this email in spam, please mark as <b>Not Spam</b> to ensure future delivery.</p>
-                      <footer style="margin-top:18px;padding-top:8px;border-top:1px solid #eee;color:#999;font-size:12px;">
-                        <div>RentHub — Bike & Vehicle Rentals</div>
-                        <div>support@renthub.example | +91 90000 00000</div>
-                        <div>123 RentHub Street, City, Country</div>
-                      </footer>
-                    </div>
-                `;
-
-                const mailOptions = {
-                    from: `"RentHub Booking" <${transporter.options.auth.user}>`,
-                    to: booking.users.email,
-                    subject: 'Booking Confirmed – RentHub',
-                    html: mailHtml,
-                    attachments: [
-                        { filename: 'booking_invoice.pdf', content: pdfBuffer }
-                    ]
-                };
-
-                await transporter.sendMail(mailOptions);
-                console.log('✅ Booking confirmation email with PDF sent successfully to:', booking.users.email);
-            } catch (emailError) {
-                console.error('❌ Error sending booking confirmation email:', emailError);
-                // Don't fail the booking confirmation if email fails
-            }
-        }
-
-        // Make outbound call to user using Retell AI
-        // Debug: Log the booking structure to understand data format
-        console.log('📋 Booking data structure:', JSON.stringify(booking, null, 2));
-        console.log('📋 Users data:', booking.users);
-
-        // Handle different possible data structures from Supabase
-        let userPhoneNumber = null;
-        let userName = 'Customer';
-
-        if (booking.users) {
-            // Supabase might return users as an object or array
-            if (Array.isArray(booking.users)) {
-                userPhoneNumber = booking.users[0]?.phone_number;
-                userName = booking.users[0]?.full_name || 'Customer';
-            } else {
-                userPhoneNumber = booking.users.phone_number;
-                userName = booking.users.full_name || 'Customer';
-            }
-        }
-
-        console.log('📞 Extracted phone number:', userPhoneNumber);
-        console.log('👤 Extracted user name:', userName);
-
-        if (userPhoneNumber) {
-            try {
-                const duration = parseInt(booking.duration) || 0;
-                const vehiclePrice = vehicle ? parseFloat(vehicle.price) || 0 : 0;
-                const totalAmount = duration * vehiclePrice;
-                const advancePayment = parseFloat(booking.advance_payment) || 100;
-                const remainingAmount = totalAmount - advancePayment;
-
-                const bookingDetails = {
-                    bookingId: bookingId,
-                    vehicleName: vehicle ? vehicle.name : 'N/A',
-                    vehicleType: vehicle ? vehicle.type : booking.vehicle_type || 'N/A',
-                    startDate: booking.start_date || 'N/A',
-                    startTime: booking.start_time || 'N/A',
-                    duration: duration,
-                    totalAmount: totalAmount,
-                    advancePayment: advancePayment,
-                    remainingAmount: remainingAmount,
-                    userName: userName
-                };
-
-                console.log('📞 Initiating Retell AI call with details:', {
-                    phoneNumber: userPhoneNumber,
-                    bookingDetails: bookingDetails
-                });
-
-                const callResult = await makeBookingConfirmationCall(
-                    userPhoneNumber,
-                    bookingDetails
-                );
-
-                if (callResult.success) {
-                    console.log('📞 Booking confirmation call initiated successfully');
-                    console.log('Call ID:', callResult.callId);
-                } else {
-                    console.error('❌ Failed to initiate booking confirmation call:', callResult.error);
-                    console.error('Call result details:', callResult);
-                    // Don't fail the booking confirmation if call fails
-                }
-            } catch (callError) {
-                console.error('❌ Error making booking confirmation call:', callError);
-                console.error('Error stack:', callError.stack);
-                // Don't fail the booking confirmation if call fails
-            }
-        } else {
-            console.log('⚠️ No phone number available for booking confirmation call');
-            console.log('Booking user data:', booking.users);
-        }
-
+        // Send response immediately to avoid timeout/latency
         res.json(updatedBooking);
+
+        // Perform background tasks (Email & Call) asynchronously
+        // This ensures the UI doesn't hang while waiting for these services
+        (async () => {
+            console.log('🔄 Starting background notifications for booking:', bookingId);
+
+            // 1. Send Email
+            if (booking.users?.email && booking.users?.full_name) {
+                try {
+                    const duration = parseInt(booking.duration) || 0;
+                    const vehiclePrice = vehicle ? parseFloat(vehicle.price) || 0 : 0;
+                    const totalAmount = duration * vehiclePrice;
+                    const advancePayment = parseFloat(booking.advance_payment) || 100;
+                    const remainingAmount = totalAmount - advancePayment;
+
+                    // Generate PDF invoice buffer
+                    const pdfBuffer = await generateInvoiceBuffer(
+                        bookingId,
+                        booking.users.full_name,
+                        booking.users.email,
+                        vehicle ? vehicle.name : 'Vehicle',
+                        duration,
+                        `${booking.start_date} ${booking.start_time}`,
+                        totalAmount,
+                        advancePayment
+                    );
+
+                    // Build Google Calendar link
+                    const dayjs = require('dayjs');
+                    const start = dayjs(`${booking.start_date}T${booking.start_time}`);
+                    const end = start.add(duration, 'hour');
+                    const formatForCal = (d) => {
+                        const iso = (new Date(d)).toISOString();
+                        return iso.replace(/[-:]/g, '').split('.')[0] + 'Z';
+                    };
+                    const gcalDates = `${formatForCal(start)}/${formatForCal(end)}`;
+                    const gcalBase = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+                    const gcalText = encodeURIComponent(`RentHub booking ${bookingId} — ${vehicle ? vehicle.name : 'Vehicle'}`);
+                    const gcalDetails = encodeURIComponent(`Booking ID: ${bookingId}\nVehicle: ${vehicle ? vehicle.name : 'Vehicle'}\nPickup: ${booking.start_date} ${booking.start_time}`);
+                    const gcalUrl = `${gcalBase}&text=${gcalText}&dates=${gcalDates}&details=${gcalDetails}`;
+
+                    // Send email with PDF attachment
+                    const { transporter } = require('./config/emailService');
+                    const mailHtml = `
+                        <div style="font-family: Arial, sans-serif; color: #222;">
+                          <h2 style="color:#0b5cff;">Hello ${booking.users.full_name},</h2>
+                          <p>Your booking is confirmed! Please find your invoice attached.</p>
+                          <h3>Booking Details</h3>
+                          <table style="width:100%; border-collapse: collapse;">
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Booking ID</b></td><td style="padding:6px; border:1px solid #eee;">${bookingId}</td></tr>
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Vehicle</b></td><td style="padding:6px; border:1px solid #eee;">${vehicle ? vehicle.name : 'Vehicle'}</td></tr>
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Pickup Date & Time</b></td><td style="padding:6px; border:1px solid #eee;">${booking.start_date} ${booking.start_time}</td></tr>
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Duration</b></td><td style="padding:6px; border:1px solid #eee;">${duration} hours</td></tr>
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Total Amount</b></td><td style="padding:6px; border:1px solid #eee;">₹${totalAmount}</td></tr>
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Advance Paid</b></td><td style="padding:6px; border:1px solid #eee;">₹${advancePayment}</td></tr>
+                            <tr><td style="padding:6px; border:1px solid #eee;"><b>Remaining Amount</b></td><td style="padding:6px; border:1px solid #eee;">₹${remainingAmount}</td></tr>
+                          </table>
+                          <p style="margin-top:12px;">
+                            <a href="${gcalUrl}" style="display:inline-block;padding:10px 14px;background:#0b5cff;color:#fff;border-radius:4px;text-decoration:none;">Add to Google Calendar</a>
+                          </p>
+                          <hr style="margin-top:18px;" />
+                          <p style="font-size:12px;color:#666;"><b>Pickup Instructions:</b> Please bring a valid ID and a printed or digital copy of this invoice. If you have any questions, call us.</p>
+                          <p style="font-size:12px;color:#666;">If you find this email in spam, please mark as <b>Not Spam</b> to ensure future delivery.</p>
+                          <footer style="margin-top:18px;padding-top:8px;border-top:1px solid #eee;color:#999;font-size:12px;">
+                            <div>RentHub — Bike & Vehicle Rentals</div>
+                            <div>support@renthub.example | +91 90000 00000</div>
+                            <div>123 RentHub Street, City, Country</div>
+                          </footer>
+                        </div>
+                    `;
+
+                    const mailOptions = {
+                        from: `"RentHub Booking" <${transporter.options.auth.user}>`,
+                        to: booking.users.email,
+                        subject: 'Booking Confirmed – RentHub',
+                        html: mailHtml,
+                        attachments: [
+                            { filename: 'booking_invoice.pdf', content: pdfBuffer }
+                        ]
+                    };
+
+                    await transporter.sendMail(mailOptions);
+                    console.log('✅ Booking confirmation email with PDF sent successfully to:', booking.users.email);
+                } catch (emailError) {
+                    console.error('❌ Error sending booking confirmation email:', emailError);
+                }
+            }
+
+            // 2. Make Call
+            // Handle different possible data structures from Supabase
+            let userPhoneNumber = null;
+            let userName = 'Customer';
+
+            if (booking.users) {
+                // Supabase might return users as an object or array
+                if (Array.isArray(booking.users)) {
+                    userPhoneNumber = booking.users[0]?.phone_number;
+                    userName = booking.users[0]?.full_name || 'Customer';
+                } else {
+                    userPhoneNumber = booking.users.phone_number;
+                    userName = booking.users.full_name || 'Customer';
+                }
+            }
+
+            if (userPhoneNumber) {
+                try {
+                    const duration = parseInt(booking.duration) || 0;
+                    const vehiclePrice = vehicle ? parseFloat(vehicle.price) || 0 : 0;
+                    const totalAmount = duration * vehiclePrice;
+                    const advancePayment = parseFloat(booking.advance_payment) || 100;
+                    const remainingAmount = totalAmount - advancePayment;
+
+                    const bookingDetails = {
+                        bookingId: bookingId,
+                        vehicleName: vehicle ? vehicle.name : 'N/A',
+                        vehicleType: vehicle ? vehicle.type : booking.vehicle_type || 'N/A',
+                        startDate: booking.start_date || 'N/A',
+                        startTime: booking.start_time || 'N/A',
+                        duration: duration,
+                        totalAmount: totalAmount,
+                        advancePayment: advancePayment,
+                        remainingAmount: remainingAmount,
+                        userName: userName
+                    };
+
+                    console.log('📞 Initiating Retell AI call in background...');
+                    const callResult = await makeBookingConfirmationCall(
+                        userPhoneNumber,
+                        bookingDetails
+                    );
+
+                    if (callResult.success) {
+                        console.log('✅ Booking confirmation call initiated successfully. Call ID:', callResult.callId);
+                    } else {
+                        console.error('❌ Failed to initiate booking confirmation call:', callResult.error);
+                    }
+                } catch (callError) {
+                    console.error('❌ Error making booking confirmation call:', callError);
+                }
+            } else {
+                console.log('⚠️ No phone number available for booking confirmation call');
+            }
+        })().catch(err => console.error('❌ Background notification error:', err));
+
     } catch (error) {
         console.error('Error confirming booking:', error);
         res.status(500).json({ error: 'Error confirming booking' });
