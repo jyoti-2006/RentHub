@@ -724,17 +724,6 @@ app.post('/api/admin/bookings/:id/confirm', verifyAdminToken, async (req, res) =
                             <div>RentHub — Bike & Vehicle Rentals</div>
                             <div>support@renthub.example | +91 90000 00000</div>
                             <div>123 RentHub Street, City, Country</div>
-                          </footer>
-                        </div>
-                    `;
-
-                    const mailOptions = {
-                        from: `"RentHub Booking" <${transporter.options.auth.user}>`,
-                        to: booking.users.email,
-                        subject: 'Booking Confirmed – RentHub',
-                        html: mailHtml,
-                        attachments: [
-                            { filename: 'booking_invoice.pdf', content: pdfBuffer }
                         ]
                     };
 
@@ -816,17 +805,17 @@ app.post('/api/admin/bookings/:id/reject', verifyAdminToken, async (req, res) =>
         const { data: booking, error: fetchError } = await supabase
             .from('bookings')
             .select(`
-                id,
-                user_id,
-                vehicle_id,
-                vehicle_type,
-                start_date,
-                start_time,
-                duration,
-                status,
-                created_at,
-                transaction_id
-            `)
+                    id,
+                        user_id,
+                        vehicle_id,
+                        vehicle_type,
+                        start_date,
+                        start_time,
+                        duration,
+                        status,
+                        created_at,
+                        transaction_id
+                            `)
             .eq('id', bookingId)
             .single();
 
@@ -1042,1288 +1031,1288 @@ app.post('/api/admin/send-sos', verifyAdminToken, async (req, res) => {
 
         // Generate unique SOS token
         const sosToken = crypto.randomBytes(32).toString('hex');
-        const sosActivationLink = `${process.env.FRONTEND_URL || 'http://localhost:3005'}/sos-activate?token=${sosToken}&bookingId=${bookingId}`;
+        const sosActivationLink = `${ process.env.FRONTEND_URL || 'http://localhost:3005' }/sos-activate?token=${sosToken}&bookingId=${bookingId}`;
 
-        // Store SOS token in a simple variable/cache (since DB columns don't exist)
-        // In production, you'd want to store this in a separate SOS_tokens table or cache like Redis
-        if (!global.sosTokens) {
-            global.sosTokens = {};
-        }
-        global.sosTokens[sosToken] = {
-            bookingId,
-            createdAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-        };
+                    // Store SOS token in a simple variable/cache (since DB columns don't exist)
+                    // In production, you'd want to store this in a separate SOS_tokens table or cache like Redis
+                    if (!global.sosTokens) {
+                        global.sosTokens = {};
+                    }
+                    global.sosTokens[sosToken] = {
+                        bookingId,
+                        createdAt: new Date().toISOString(),
+                        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+                    };
 
-        // Send SOS link email to user
-        const emailResult = await sendSOSLinkEmail(userEmail, userName, sosActivationLink);
+                    // Send SOS link email to user
+                    const emailResult = await sendSOSLinkEmail(userEmail, userName, sosActivationLink);
 
-        if (!emailResult.success) {
-            return res.status(500).json({ error: 'Failed to send email: ' + emailResult.error });
-        }
+                    if (!emailResult.success) {
+                        return res.status(500).json({ error: 'Failed to send email: ' + emailResult.error });
+                    }
 
-        res.json({
-            success: true,
-            message: 'SOS activation link sent to ' + userEmail
+                    res.json({
+                        success: true,
+                        message: 'SOS activation link sent to ' + userEmail
+                    });
+                } catch (error) {
+                    res.status(500).json({ error: 'Error sending SOS: ' + error.message });
+                }
+            });
+
+
+        // Admin: Cancel booking
+        app.post('/api/admin/bookings/:id/cancel', verifyAdminToken, async (req, res) => {
+            try {
+                const bookingId = parseInt(req.params.id);
+                console.log('Processing booking cancellation for ID:', bookingId);
+
+                // First, fetch the booking
+                const { data: booking, error: fetchError } = await supabase
+                    .from('bookings')
+                    .select('*, users:user_id(*)')
+                    .eq('id', bookingId)
+                    .single();
+
+                if (fetchError) {
+                    console.error('Error fetching booking:', fetchError);
+                    return res.status(500).json({ error: 'Error fetching booking details' });
+                }
+
+                if (!booking) {
+                    return res.status(404).json({ error: 'Booking not found' });
+                }
+
+                if (booking.status !== 'confirmed') {
+                    return res.status(400).json({ error: 'Only confirmed bookings can be cancelled' });
+                }
+
+                // Calculate refund amount based on time since confirmation
+                const now = new Date();
+                const confirmationTime = booking.confirmation_timestamp ? new Date(booking.confirmation_timestamp) : now;
+                const hoursSinceConfirmation = (now - confirmationTime) / (1000 * 60 * 60);
+
+                console.log('Booking cancellation debug:', {
+                    confirmation_timestamp: booking.confirmation_timestamp,
+                    now: new Date().toISOString(),
+                    advance_payment: booking.advance_payment
+                });
+
+                let refundAmount = 0;
+                // Calculate refund based on advance payment only
+                const advancePayment = parseFloat(booking.advance_payment) || 100; // Default to 100 if not set
+                if (hoursSinceConfirmation <= 2) {
+                    // Full refund of advance payment
+                    refundAmount = advancePayment;
+                } else {
+                    // 70% refund of advance payment
+                    refundAmount = Math.round(advancePayment * 0.7);
+                }
+
+                console.log('hoursSinceConfirmation:', hoursSinceConfirmation);
+
+                // Calculate deduction
+                let deductionAmount = 0;
+                if (hoursSinceConfirmation > 2) {
+                    deductionAmount = Math.round(advancePayment * 0.3);
+                }
+                // Use local time for cancelled_timestamp
+                const nowCancel = new Date();
+                const localCancelTimestamp = nowCancel.getFullYear() + '-' +
+                    String(nowCancel.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(nowCancel.getDate()).padStart(2, '0') + ' ' +
+                    String(nowCancel.getHours()).padStart(2, '0') + ':' +
+                    String(nowCancel.getMinutes()).padStart(2, '0') + ':' +
+                    String(nowCancel.getSeconds()).padStart(2, '0');
+                // Update booking status to cancelled with refund details, timestamps, and deduction
+                const { data: updatedBooking, error: updateError } = await supabase
+                    .from('bookings')
+                    .update({
+                        status: 'cancelled',
+                        refund_amount: refundAmount,
+                        refund_status: 'processing',
+                        refund_details: req.body && req.body.refundDetails ? req.body.refundDetails : null,
+                        cancelled_timestamp: localCancelTimestamp,
+                        refund_deduction: deductionAmount
+                    })
+                    .eq('id', bookingId)
+                    .select('*, users:user_id(*)')
+                    .single();
+
+                if (updateError) {
+                    console.error('Error updating booking:', updateError);
+                    return res.status(500).json({ error: 'Error updating booking status' });
+                }
+
+                // Update vehicle availability back to true
+                if (booking.vehicle_id && booking.vehicle_type) {
+                    let vehicleTable = booking.vehicle_type;
+                    if (vehicleTable === 'car') vehicleTable = 'cars';
+                    if (vehicleTable === 'bike') vehicleTable = 'bikes';
+
+                    const { error: vehicleError } = await supabase
+                        .from(vehicleTable)
+                        .update({ is_available: true })
+                        .eq('id', booking.vehicle_id);
+
+                    if (vehicleError) {
+                        console.error('Error updating vehicle:', vehicleError);
+                    }
+                }
+
+                console.log('Booking cancelled successfully:', updatedBooking);
+
+                res.json({
+                    message: 'Booking cancelled successfully',
+                    refundAmount,
+                    booking: updatedBooking
+                });
+            } catch (error) {
+                console.error('Error in cancel booking endpoint:', error);
+                res.status(500).json({
+                    error: 'Error cancelling booking',
+                    details: error.message
+                });
+            }
         });
-    } catch (error) {
-        res.status(500).json({ error: 'Error sending SOS: ' + error.message });
-    }
-});
 
+        // Function to check for time-based booking conflicts
+        async function checkTimeConflict(vehicleId, startDate, startTime, duration) {
+            try {
+                const { data: existingBookings, error } = await supabase
+                    .from('bookings')
+                    .select('*')
+                    .eq('vehicle_id', vehicleId)
+                    .eq('start_date', startDate)
+                    .neq('status', 'cancelled')
+                    .neq('status', 'rejected');
 
-// Admin: Cancel booking
-app.post('/api/admin/bookings/:id/cancel', verifyAdminToken, async (req, res) => {
-    try {
-        const bookingId = parseInt(req.params.id);
-        console.log('Processing booking cancellation for ID:', bookingId);
+                if (error) {
+                    console.error('Supabase error in checkTimeConflict:', error);
+                    throw error;
+                }
 
-        // First, fetch the booking
-        const { data: booking, error: fetchError } = await supabase
-            .from('bookings')
-            .select('*, users:user_id(*)')
-            .eq('id', bookingId)
-            .single();
+                if (!Array.isArray(existingBookings)) {
+                    console.error('existingBookings is not an array:', existingBookings);
+                    return { conflict: false };
+                }
 
-        if (fetchError) {
-            console.error('Error fetching booking:', fetchError);
-            return res.status(500).json({ error: 'Error fetching booking details' });
-        }
-
-        if (!booking) {
-            return res.status(404).json({ error: 'Booking not found' });
-        }
-
-        if (booking.status !== 'confirmed') {
-            return res.status(400).json({ error: 'Only confirmed bookings can be cancelled' });
-        }
-
-        // Calculate refund amount based on time since confirmation
-        const now = new Date();
-        const confirmationTime = booking.confirmation_timestamp ? new Date(booking.confirmation_timestamp) : now;
-        const hoursSinceConfirmation = (now - confirmationTime) / (1000 * 60 * 60);
-
-        console.log('Booking cancellation debug:', {
-            confirmation_timestamp: booking.confirmation_timestamp,
-            now: new Date().toISOString(),
-            advance_payment: booking.advance_payment
-        });
-
-        let refundAmount = 0;
-        // Calculate refund based on advance payment only
-        const advancePayment = parseFloat(booking.advance_payment) || 100; // Default to 100 if not set
-        if (hoursSinceConfirmation <= 2) {
-            // Full refund of advance payment
-            refundAmount = advancePayment;
-        } else {
-            // 70% refund of advance payment
-            refundAmount = Math.round(advancePayment * 0.7);
-        }
-
-        console.log('hoursSinceConfirmation:', hoursSinceConfirmation);
-
-        // Calculate deduction
-        let deductionAmount = 0;
-        if (hoursSinceConfirmation > 2) {
-            deductionAmount = Math.round(advancePayment * 0.3);
-        }
-        // Use local time for cancelled_timestamp
-        const nowCancel = new Date();
-        const localCancelTimestamp = nowCancel.getFullYear() + '-' +
-            String(nowCancel.getMonth() + 1).padStart(2, '0') + '-' +
-            String(nowCancel.getDate()).padStart(2, '0') + ' ' +
-            String(nowCancel.getHours()).padStart(2, '0') + ':' +
-            String(nowCancel.getMinutes()).padStart(2, '0') + ':' +
-            String(nowCancel.getSeconds()).padStart(2, '0');
-        // Update booking status to cancelled with refund details, timestamps, and deduction
-        const { data: updatedBooking, error: updateError } = await supabase
-            .from('bookings')
-            .update({
-                status: 'cancelled',
-                refund_amount: refundAmount,
-                refund_status: 'processing',
-                refund_details: req.body && req.body.refundDetails ? req.body.refundDetails : null,
-                cancelled_timestamp: localCancelTimestamp,
-                refund_deduction: deductionAmount
-            })
-            .eq('id', bookingId)
-            .select('*, users:user_id(*)')
-            .single();
-
-        if (updateError) {
-            console.error('Error updating booking:', updateError);
-            return res.status(500).json({ error: 'Error updating booking status' });
-        }
-
-        // Update vehicle availability back to true
-        if (booking.vehicle_id && booking.vehicle_type) {
-            let vehicleTable = booking.vehicle_type;
-            if (vehicleTable === 'car') vehicleTable = 'cars';
-            if (vehicleTable === 'bike') vehicleTable = 'bikes';
-
-            const { error: vehicleError } = await supabase
-                .from(vehicleTable)
-                .update({ is_available: true })
-                .eq('id', booking.vehicle_id);
-
-            if (vehicleError) {
-                console.error('Error updating vehicle:', vehicleError);
+                // Convert start time to minutes for easier comparison
+                const [startHour, startMinute] = startTime.split(':').map(Number);
+                const startTimeMinutes = startHour * 60 + startMinute;
+                const endTimeMinutes = startTimeMinutes + (duration * 60);
+                // Add 1-hour buffer before and after
+                const bufferStartTime = startTimeMinutes - 60;
+                const bufferEndTime = endTimeMinutes + 60;
+                for (const booking of existingBookings) {
+                    const [existingHour, existingMinute] = booking.startTime.split(':').map(Number);
+                    const existingStartTimeMinutes = existingHour * 60 + existingMinute;
+                    const existingEndTimeMinutes = existingStartTimeMinutes + (booking.duration * 60);
+                    if (existingStartTimeMinutes < bufferEndTime && existingEndTimeMinutes > bufferStartTime) {
+                        return {
+                            conflict: true,
+                            existingBooking: booking,
+                            message: `Vehicle is already booked from ${booking.startTime} for ${booking.duration} hours. Please choose a different time slot with at least 1 hour gap.`
+                        };
+                    }
+                }
+                return { conflict: false };
+            } catch (error) {
+                console.error('Error checking time conflict:', error);
+                throw error;
             }
         }
 
-        console.log('Booking cancelled successfully:', updatedBooking);
+        // User Registration
+        // Send registration OTP - call this when the user/admin enters email and requests verification
+        app.post('/api/register/send-otp', async (req, res) => {
+            try {
+                const { email } = req.body;
+                if (!email) return res.status(400).json({ error: 'Email is required' });
 
-        res.json({
-            message: 'Booking cancelled successfully',
-            refundAmount,
-            booking: updatedBooking
+                // If user already exists, don't send OTP
+                const existingUser = await SupabaseDB.getUserByEmail(email);
+                if (existingUser) return res.status(400).json({ error: 'Email already registered' });
+
+                // Generate OTP
+                const otp = generateOTP();
+                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+                // Remove any previous OTPs for this email and insert the new OTP
+                await supabase.from('password_reset_otps').delete().eq('email', email);
+                const { error: otpError } = await supabase.from('password_reset_otps').insert({
+                    user_id: null,
+                    email: email,
+                    otp: otp,
+                    expires_at: otpExpiry,
+                    created_at: new Date().toISOString()
+                });
+
+                if (otpError) {
+                    console.error('Error storing registration OTP:', otpError);
+                    return res.status(500).json({ error: 'Error generating OTP' });
+                }
+
+                // Send OTP email
+                const emailResult = await sendRegistrationOTP(email, '', otp);
+                if (!emailResult.success) {
+                    console.error('Failed to send registration OTP:', emailResult.error);
+                    return res.status(500).json({ error: 'Failed to send OTP email' });
+                }
+
+                res.json({ message: 'OTP sent successfully to your email' });
+            } catch (error) {
+                console.error('Error in /api/register/send-otp:', error);
+                res.status(500).json({ error: 'Error sending OTP' });
+            }
         });
-    } catch (error) {
-        console.error('Error in cancel booking endpoint:', error);
-        res.status(500).json({
-            error: 'Error cancelling booking',
-            details: error.message
-        });
-    }
-});
 
-// Function to check for time-based booking conflicts
-async function checkTimeConflict(vehicleId, startDate, startTime, duration) {
-    try {
-        const { data: existingBookings, error } = await supabase
-            .from('bookings')
-            .select('*')
-            .eq('vehicle_id', vehicleId)
-            .eq('start_date', startDate)
-            .neq('status', 'cancelled')
-            .neq('status', 'rejected');
+        app.post('/api/register/user', async (req, res) => {
+            try {
+                const { fullName, email, phoneNumber, password, confirmPassword, otp } = req.body;
 
-        if (error) {
-            console.error('Supabase error in checkTimeConflict:', error);
-            throw error;
-        }
+                // Check if user exists
+                const existingUser = await SupabaseDB.getUserByEmail(email);
+                if (existingUser) {
+                    return res.status(400).json({ error: 'Email already exists' });
+                }
 
-        if (!Array.isArray(existingBookings)) {
-            console.error('existingBookings is not an array:', existingBookings);
-            return { conflict: false };
-        }
+                // Verify OTP exists and not expired
+                if (!otp) {
+                    return res.status(400).json({ error: 'OTP required to complete registration' });
+                }
 
-        // Convert start time to minutes for easier comparison
-        const [startHour, startMinute] = startTime.split(':').map(Number);
-        const startTimeMinutes = startHour * 60 + startMinute;
-        const endTimeMinutes = startTimeMinutes + (duration * 60);
-        // Add 1-hour buffer before and after
-        const bufferStartTime = startTimeMinutes - 60;
-        const bufferEndTime = endTimeMinutes + 60;
-        for (const booking of existingBookings) {
-            const [existingHour, existingMinute] = booking.startTime.split(':').map(Number);
-            const existingStartTimeMinutes = existingHour * 60 + existingMinute;
-            const existingEndTimeMinutes = existingStartTimeMinutes + (booking.duration * 60);
-            if (existingStartTimeMinutes < bufferEndTime && existingEndTimeMinutes > bufferStartTime) {
-                return {
-                    conflict: true,
-                    existingBooking: booking,
-                    message: `Vehicle is already booked from ${booking.startTime} for ${booking.duration} hours. Please choose a different time slot with at least 1 hour gap.`
+                const { data: otpRecord, error: otpError } = await supabase
+                    .from('password_reset_otps')
+                    .select('*')
+                    .eq('email', email)
+                    .eq('otp', otp)
+                    .gte('expires_at', new Date().toISOString())
+                    .single();
+
+                if (otpError || !otpRecord) {
+                    return res.status(400).json({ error: 'Invalid or expired OTP' });
+                }
+
+                // Validate passwords
+                if (!confirmPassword) return res.status(400).json({ error: 'Please confirm your password' });
+                if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
+
+                const { valid, errors } = validatePassword(password);
+                if (!valid) return res.status(400).json({ error: 'Password validation failed', details: errors });
+
+                const hashedPassword = await bcrypt.hash(password, 10);
+                const newUser = {
+                    full_name: fullName,
+                    email,
+                    phone_number: phoneNumber,
+                    password: hashedPassword,
+                    is_admin: false
                 };
-            }
-        }
-        return { conflict: false };
-    } catch (error) {
-        console.error('Error checking time conflict:', error);
-        throw error;
-    }
-}
 
-// User Registration
-// Send registration OTP - call this when the user/admin enters email and requests verification
-app.post('/api/register/send-otp', async (req, res) => {
-    try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ error: 'Email is required' });
+                const created = await SupabaseDB.createUser(newUser);
 
-        // If user already exists, don't send OTP
-        const existingUser = await SupabaseDB.getUserByEmail(email);
-        if (existingUser) return res.status(400).json({ error: 'Email already registered' });
-
-        // Generate OTP
-        const otp = generateOTP();
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-        // Remove any previous OTPs for this email and insert the new OTP
-        await supabase.from('password_reset_otps').delete().eq('email', email);
-        const { error: otpError } = await supabase.from('password_reset_otps').insert({
-            user_id: null,
-            email: email,
-            otp: otp,
-            expires_at: otpExpiry,
-            created_at: new Date().toISOString()
-        });
-
-        if (otpError) {
-            console.error('Error storing registration OTP:', otpError);
-            return res.status(500).json({ error: 'Error generating OTP' });
-        }
-
-        // Send OTP email
-        const emailResult = await sendRegistrationOTP(email, '', otp);
-        if (!emailResult.success) {
-            console.error('Failed to send registration OTP:', emailResult.error);
-            return res.status(500).json({ error: 'Failed to send OTP email' });
-        }
-
-        res.json({ message: 'OTP sent successfully to your email' });
-    } catch (error) {
-        console.error('Error in /api/register/send-otp:', error);
-        res.status(500).json({ error: 'Error sending OTP' });
-    }
-});
-
-app.post('/api/register/user', async (req, res) => {
-    try {
-        const { fullName, email, phoneNumber, password, confirmPassword, otp } = req.body;
-
-        // Check if user exists
-        const existingUser = await SupabaseDB.getUserByEmail(email);
-        if (existingUser) {
-            return res.status(400).json({ error: 'Email already exists' });
-        }
-
-        // Verify OTP exists and not expired
-        if (!otp) {
-            return res.status(400).json({ error: 'OTP required to complete registration' });
-        }
-
-        const { data: otpRecord, error: otpError } = await supabase
-            .from('password_reset_otps')
-            .select('*')
-            .eq('email', email)
-            .eq('otp', otp)
-            .gte('expires_at', new Date().toISOString())
-            .single();
-
-        if (otpError || !otpRecord) {
-            return res.status(400).json({ error: 'Invalid or expired OTP' });
-        }
-
-        // Validate passwords
-        if (!confirmPassword) return res.status(400).json({ error: 'Please confirm your password' });
-        if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
-
-        const { valid, errors } = validatePassword(password);
-        if (!valid) return res.status(400).json({ error: 'Password validation failed', details: errors });
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = {
-            full_name: fullName,
-            email,
-            phone_number: phoneNumber,
-            password: hashedPassword,
-            is_admin: false
-        };
-
-        const created = await SupabaseDB.createUser(newUser);
-
-        // Delete used OTP record
-        await supabase.from('password_reset_otps').delete().eq('id', otpRecord.id);
-        res.status(201).json({ message: 'User registered successfully' });
-    } catch (error) {
-        console.error('Error registering user:', error);
-        res.status(500).json({ error: 'Error registering user' });
-    }
-});
-
-// Admin Registration
-app.post('/api/register/admin', async (req, res) => {
-    try {
-        const { adminName, email, adminId, password, confirmPassword, securityCode, otp } = req.body;
-
-        if (securityCode !== '1575') {
-            return res.status(403).json({ error: 'Invalid Security Code. You are not authorized to register as admin.' });
-        }
-
-        const existingUser = await SupabaseDB.getUserByEmail(email);
-        if (existingUser) {
-            return res.status(400).json({ error: 'Email already exists' });
-        }
-
-        // Verify OTP exists and not expired
-        if (!otp) {
-            return res.status(400).json({ error: 'OTP required to complete registration' });
-        }
-
-        const { data: otpRecord, error: otpError } = await supabase
-            .from('password_reset_otps')
-            .select('*')
-            .eq('email', email)
-            .eq('otp', otp)
-            .gte('expires_at', new Date().toISOString())
-            .single();
-
-        if (otpError || !otpRecord) {
-            return res.status(400).json({ error: 'Invalid or expired OTP' });
-        }
-
-        // Validate passwords
-        if (!confirmPassword) return res.status(400).json({ error: 'Please confirm your password' });
-        if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
-
-        const { valid, errors } = validatePassword(password);
-        if (!valid) return res.status(400).json({ error: 'Password validation failed', details: errors });
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newAdmin = {
-            admin_name: adminName,
-            email,
-            admin_id: adminId,
-            password: hashedPassword,
-            is_admin: true
-        };
-
-        const created = await SupabaseDB.createUser(newAdmin);
-
-        // Delete used OTP record
-        await supabase.from('password_reset_otps').delete().eq('id', otpRecord.id);
-        res.status(201).json({ message: 'Admin registered successfully' });
-    } catch (error) {
-        console.error('Error registering admin:', error);
-        res.status(500).json({ error: 'Error registering admin' });
-    }
-});
-
-// Debug endpoint to check user data (remove in production)
-app.get('/api/debug/user/:email', async (req, res) => {
-    try {
-        const { email } = req.params;
-        console.log('🔍 Debug: Checking user data for email:', email);
-
-        const user = await SupabaseDB.getUserByEmail(email);
-        console.log('📊 Debug: Raw user data:', user);
-
-        if (!user) {
-            return res.json({ error: 'User not found', email });
-        }
-
-        // Show both raw and mapped data
-        const mappedUser = {
-            id: user.id,
-            fullName: user.full_name,
-            adminName: user.admin_name,
-            email: user.email,
-            phoneNumber: user.phone_number,
-            isAdmin: user.is_admin || false
-        };
-
-        res.json({
-            raw: user,
-            mapped: mappedUser,
-            fields: {
-                hasFullName: !!user.full_name,
-                hasAdminName: !!user.admin_name,
-                hasEmail: !!user.email,
-                isAdmin: user.is_admin
+                // Delete used OTP record
+                await supabase.from('password_reset_otps').delete().eq('id', otpRecord.id);
+                res.status(201).json({ message: 'User registered successfully' });
+            } catch (error) {
+                console.error('Error registering user:', error);
+                res.status(500).json({ error: 'Error registering user' });
             }
         });
-    } catch (error) {
-        console.error('❌ Debug endpoint error:', error);
-        res.status(500).json({ error: 'Debug endpoint error', details: error.message });
-    }
-});
 
-// User Login
-app.post('/api/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        console.log('🔍 Login attempt for email:', email);
-
-        const user = await SupabaseDB.getUserByEmail(email);
-        console.log('📊 Raw user data from Supabase:', user);
-
-        if (!user) {
-            console.log('❌ User not found');
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
-
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
-            console.log('❌ Invalid password');
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, email: user.email, isAdmin: user.is_admin },
-            JWT_SECRET
-        );
-
-        // Map snake_case to camelCase for frontend compatibility
-        const userResponse = {
-            id: user.id,
-            fullName: user.full_name,
-            adminName: user.admin_name,
-            email: user.email,
-            phoneNumber: user.phone_number,
-            isAdmin: user.is_admin || false
-        };
-
-        console.log('🎯 Mapped user response:', userResponse);
-        console.log('✅ Login successful for:', userResponse.fullName || userResponse.adminName || userResponse.email);
-
-        res.json({ token, user: userResponse });
-    } catch (error) {
-        console.error('❌ Error during login:', error);
-        res.status(500).json({ error: 'Error during login' });
-    }
-});
-
-// Admin Login
-app.post('/api/login/admin', async (req, res) => {
-    try {
-        const { email, password, adminId } = req.body;
-        // Find the admin by email
-        const admin = await SupabaseDB.getUserByEmail(email);
-        if (!admin || !admin.is_admin || admin.admin_id !== adminId) {
-            return res.status(401).json({ error: 'Invalid admin credentials' });
-        }
-        const validPassword = await bcrypt.compare(password, admin.password);
-        if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid admin credentials' });
-        }
-        const token = jwt.sign(
-            { id: admin.id, email: admin.email, isAdmin: admin.is_admin },
-            JWT_SECRET
-        );
-
-        // Map snake_case to camelCase for frontend compatibility
-        const adminResponse = {
-            id: admin.id,
-            fullName: admin.full_name,
-            adminName: admin.admin_name,
-            email: admin.email,
-            phoneNumber: admin.phone_number,
-            adminId: admin.admin_id,
-            isAdmin: admin.is_admin || false
-        };
-
-        res.json({ token, admin: adminResponse });
-    } catch (error) {
-        console.error('Error during admin login:', error);
-        res.status(500).json({ error: 'Error during admin login' });
-    }
-});
-
-// Get all vehicles
-app.get('/api/vehicles/:type', async (req, res) => {
-    const { type } = req.params;
-    try {
-        const vehicles = await SupabaseDB.getVehicles(type);
-        res.json(vehicles);
-    } catch (error) {
-        console.error(`Error fetching ${type}:`, error);
-        res.status(500).json({ error: `Error fetching ${type}` });
-    }
-});
-
-// Get a specific vehicle by type and ID
-app.get('/api/vehicles/:type/:id', async (req, res) => {
-    try {
-        let { type, id } = req.params;
-        console.log('Requested type:', type, 'Requested id:', id);
-        if (type === 'car') type = 'cars';
-        if (type === 'bike') type = 'bikes';
-        if (type === 'scooty') type = 'scooty';
-        console.log('Mapped type:', type, 'ID:', id);
-        const vehicle = await SupabaseDB.getVehicleById(type, id);
-        console.log('Vehicle result:', vehicle);
-        if (!vehicle) {
-            return res.status(404).json({ error: 'Vehicle not found' });
-        }
-        res.json(vehicle);
-    } catch (error) {
-        console.error(`Error fetching vehicle:`, error);
-        res.status(500).json({ error: 'Error fetching vehicle' });
-    }
-});
-
-// Create booking
-app.post('/api/bookings', authenticateToken, async (req, res) => {
-    try {
-        console.log('--- Booking Request Received ---');
-        console.log('User:', req.user);
-        console.log('Body:', req.body);
-        const { vehicleId, startDate, startTime, duration, vehicleType, transactionId } = req.body;
-        // Validate time format (HH:mm)
-        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(startTime)) {
-            return res.status(400).json({ error: 'Invalid time format. Please use HH:mm format (24-hour)' });
-        }
-        // Convert startTime to 24-hour format if needed
-        const [hours, minutes] = startTime.split(':').map(Number);
-        const formattedStartTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        // Check for time conflicts
-        const conflict = await checkTimeConflict(vehicleId, startDate, formattedStartTime, duration);
-        if (conflict.conflict) {
-            return res.status(409).json(conflict);
-        }
-        const bookingData = {
-            user_id: req.user.id,
-            vehicle_id: vehicleId,
-            start_date: startDate,
-            start_time: formattedStartTime, // Use formatted time
-            duration,
-            status: 'pending',
-            vehicle_type: vehicleType,
-            transaction_id: transactionId
-        };
-        console.log('Booking data to insert:', bookingData);
-        const { data, error } = await supabase
-            .from('bookings')
-            .insert([bookingData])
-            .select()
-            .single();
-
-        if (error) {
-            console.error('Error creating booking:', error);
-            return res.status(500).json({ error: 'Error creating booking', details: error.message || error });
-        }
-
-        console.log('Booking created:', data);
-        // Update vehicle availability
-        try {
-            await SupabaseDB.updateVehicleAvailability(vehicleType, vehicleId, false);
-        } catch (vehicleError) {
-            console.error('Error updating vehicle availability:', vehicleError);
-            // Optionally, you can add a warning to the response here
-        }
-        res.status(201).json(data);
-    } catch (error) {
-        console.error('Error creating booking:', error);
-        res.status(500).json({ error: 'Error creating booking', details: error.message || error });
-    }
-});
-
-// Get user bookings
-app.get('/api/bookings/user', authenticateToken, async (req, res) => {
-    try {
-        const bookings = await SupabaseDB.getBookingsByUser(req.user.id);
-        res.json(bookings);
-    } catch (error) {
-        console.error('Error fetching user bookings:', error);
-        res.status(500).json({ error: 'Error fetching bookings' });
-    }
-});
-
-// Dashboard Stats
-app.get('/api/dashboard-stats', async (req, res) => {
-    try {
-        // Total vehicles = bikes + cars + scooty
-        const { count: bikeCount } = await supabase.from('bikes').select('id', { count: 'exact', head: true });
-        const { count: carCount } = await supabase.from('cars').select('id', { count: 'exact', head: true });
-        const { count: scootyCount } = await supabase.from('scooty').select('id', { count: 'exact', head: true });
-        const totalVehicles = (bikeCount || 0) + (carCount || 0) + (scootyCount || 0);
-
-        // Users
-        const { count: activeUsers } = await supabase.from('users').select('id', { count: 'exact', head: true });
-
-        // Bookings
-        const { count: totalBookingsMonth } = await supabase
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .gte('start_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
-
-        const { count: pendingBookings } = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'pending');
-        const { count: confirmedBookings } = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'confirmed');
-        const { count: cancelledBookings } = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'cancelled');
-        const { count: pendingRefunds } = await supabase
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .in('status', ['cancelled', 'rejected'])
-            .eq('refund_status', 'processing');
-
-        // Today's bookings
-        const today = new Date().toISOString().split('T')[0];
-        const { count: todaysBookings } = await supabase
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .gte('created_at', today + 'T00:00:00')
-            .lt('created_at', today + 'T23:59:59');
-
-        res.json({
-            totalVehicles,
-            totalBookingsMonth,
-            activeUsers,
-            pendingBookings,
-            confirmedBookings,
-            cancelledBookings,
-            pendingRefunds,
-            todaysBookings
-        });
-    } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-        res.status(500).json({ error: 'Error fetching dashboard stats' });
-    }
-});
-
-// Admin: Get all users
-app.get('/api/admin/users', async (req, res) => {
-    try {
-        const { data, error } = await supabase.from('users').select('*');
-        if (error) throw error;
-        // Map snake_case to camelCase for frontend compatibility
-        const mapped = (data || []).map(u => ({
-            id: u.id,
-            fullName: u.full_name,
-            adminName: u.admin_name,
-            email: u.email,
-            phoneNumber: u.phone_number,
-            isAdmin: u.is_admin,
-            isBlocked: u.is_blocked
-        }));
-        res.json(mapped);
-    } catch (error) {
-        console.error('Error fetching admin users:', error);
-        res.status(500).json({ error: 'Error fetching admin users' });
-    }
-});
-
-// Admin: Get all vehicles
-app.get('/api/admin/vehicles', async (req, res) => {
-    try {
-        const bikes = await supabase.from('bikes').select('*');
-        const cars = await supabase.from('cars').select('*');
-        const scooty = await supabase.from('scooty').select('*');
-        const allVehicles = [
-            ...(bikes.data || []).map(v => ({ ...v, type: 'bike' })),
-            ...(cars.data || []).map(v => ({ ...v, type: 'car' })),
-            ...(scooty.data || []).map(v => ({ ...v, type: 'scooty' }))
-        ];
-        res.json(allVehicles);
-    } catch (error) {
-        console.error('Error fetching admin vehicles:', error);
-        res.status(500).json({ error: 'Error fetching admin vehicles' });
-    }
-});
-
-// Admin: Get single user
-app.get('/api/admin/users/:id', async (req, res) => {
-    try {
-        const { data, error } = await supabase.from('users').select('*').eq('id', req.params.id).single();
-        if (error) throw error;
-        // Map snake_case to camelCase
-        const user = {
-            id: data.id,
-            fullName: data.full_name,
-            adminName: data.admin_name,
-            email: data.email,
-            phoneNumber: data.phone_number,
-            isAdmin: data.is_admin,
-            isBlocked: data.is_blocked,
-            createdAt: data.created_at
-        };
-        res.json(user);
-    } catch (error) {
-        console.error('Error fetching user:', error);
-        res.status(500).json({ error: 'Error fetching user' });
-    }
-});
-
-// Admin: Update user
-app.put('/api/admin/users/:id', async (req, res) => {
-    try {
-        const { fullName, email, phoneNumber } = req.body;
-        const { data, error } = await supabase.from('users').update({ full_name: fullName, email, phone_number: phoneNumber }).eq('id', req.params.id).select().single();
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('Error updating user:', error);
-        res.status(500).json({ error: 'Error updating user' });
-    }
-});
-
-// Admin: Block/Unblock user
-app.patch('/api/admin/users/:id/block', async (req, res) => {
-    try {
-        const { isBlocked } = req.body;
-        const { data, error } = await supabase.from('users').update({ is_blocked: isBlocked }).eq('id', req.params.id).select().single();
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('Error updating user status:', error);
-        res.status(500).json({ error: 'Error updating user status' });
-    }
-});
-
-// Admin: Get single vehicle
-app.get('/api/admin/vehicles/:type/:id', async (req, res) => {
-    try {
-        let { type, id } = req.params;
-        if (type === 'car') type = 'cars';
-        if (type === 'bike') type = 'bikes';
-        if (type === 'scooty') type = 'scooty';
-        const { data, error } = await supabase.from(type).select('*').eq('id', id).single();
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('Error fetching vehicle:', error);
-        res.status(500).json({ error: 'Error fetching vehicle' });
-    }
-});
-
-// Admin: Update vehicle
-app.put('/api/admin/vehicles/:type/:id', async (req, res) => {
-    try {
-        let { type, id } = req.params;
-        if (type === 'car') type = 'cars';
-        if (type === 'bike') type = 'bikes';
-        if (type === 'scooty') type = 'scooty';
-        const { data, error } = await supabase.from(type).update(req.body).eq('id', id).select().single();
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('Error updating vehicle:', error);
-        res.status(500).json({ error: 'Error updating vehicle' });
-    }
-});
-
-// Admin: Delete vehicle
-app.delete('/api/admin/vehicles/:type/:id', async (req, res) => {
-    try {
-        let { type, id } = req.params;
-        if (type === 'car') type = 'cars';
-        if (type === 'bike') type = 'bikes';
-        if (type === 'scooty') type = 'scooty';
-        const { error } = await supabase.from(type).delete().eq('id', id);
-        if (error) throw error;
-        res.json({ message: 'Vehicle deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting vehicle:', error);
-        res.status(500).json({ error: 'Error deleting vehicle' });
-    }
-});
-
-// Admin: Get policies
-app.get('/api/admin/policies', async (req, res) => {
-    try {
-        const { data, error } = await supabase.from('policies').select('*');
-        if (error) throw error;
-        res.json(data || []);
-    } catch (error) {
-        console.error('Error fetching policies:', error);
-        res.status(500).json({ error: 'Error fetching policies' });
-    }
-});
-
-// Admin: Add new vehicle
-app.post('/api/admin/vehicles/:type', async (req, res) => {
-    try {
-        let { type } = req.params;
-        if (type === 'car') type = 'cars';
-        if (type === 'bike') type = 'bikes';
-        if (type === 'scooty') type = 'scooty';
-
-        const { data, error } = await supabase
-            .from(type)
-            .insert([req.body])
-            .select()
-            .single();
-
-        if (error) throw error;
-        res.status(201).json(data);
-    } catch (error) {
-        console.error('Error adding vehicle:', error);
-        res.status(500).json({ error: 'Error adding vehicle' });
-    }
-});
-
-// User: Cancel their own booking
-app.post('/api/bookings/:id/cancel', verifyToken, async (req, res) => {
-    try {
-        const bookingId = parseInt(req.params.id);
-        const userId = req.user.id;
-        console.log('Processing user booking cancellation for ID:', bookingId);
-
-        // First, fetch the booking
-        const { data: booking, error: fetchError } = await supabase
-            .from('bookings')
-            .select('*, users:user_id(*)')
-            .eq('id', bookingId)
-            .eq('user_id', userId) // Ensure the booking belongs to the user
-            .single();
-
-        if (fetchError) {
-            console.error('Error fetching booking:', fetchError);
-            return res.status(500).json({ error: 'Error fetching booking details' });
-        }
-
-        if (!booking) {
-            return res.status(404).json({ error: 'Booking not found or unauthorized' });
-        }
-
-        if (booking.status !== 'confirmed') {
-            return res.status(400).json({ error: 'Only confirmed bookings can be cancelled' });
-        }
-
-        // Calculate refund amount based on time since confirmation
-        const now = new Date();
-        const confirmationTime = booking.confirmation_timestamp ? new Date(booking.confirmation_timestamp) : now;
-        const hoursSinceConfirmation = (now - confirmationTime) / (1000 * 60 * 60);
-
-        console.log('Booking cancellation debug:', {
-            confirmation_timestamp: booking.confirmation_timestamp,
-            now: new Date().toISOString(),
-            advance_payment: booking.advance_payment
-        });
-
-        let refundAmount = 0;
-        // Calculate refund based on advance payment only
-        const advancePayment = parseFloat(booking.advance_payment) || 100; // Default to 100 if not set
-        if (hoursSinceConfirmation <= 2) {
-            // Full refund of advance payment
-            refundAmount = advancePayment;
-        } else {
-            // 70% refund of advance payment
-            refundAmount = Math.round(advancePayment * 0.7);
-        }
-
-        console.log('hoursSinceConfirmation:', hoursSinceConfirmation);
-
-        // Calculate deduction
-        let deductionAmount = 0;
-        if (hoursSinceConfirmation > 2) {
-            deductionAmount = Math.round(advancePayment * 0.3);
-        }
-        // Use local time for cancelled_timestamp
-        const nowCancel = new Date();
-        const localCancelTimestamp = nowCancel.getFullYear() + '-' +
-            String(nowCancel.getMonth() + 1).padStart(2, '0') + '-' +
-            String(nowCancel.getDate()).padStart(2, '0') + ' ' +
-            String(nowCancel.getHours()).padStart(2, '0') + ':' +
-            String(nowCancel.getMinutes()).padStart(2, '0') + ':' +
-            String(nowCancel.getSeconds()).padStart(2, '0');
-        // Update booking status to cancelled with refund details, timestamps, and deduction
-        const { data: updatedBooking, error: updateError } = await supabase
-            .from('bookings')
-            .update({
-                status: 'cancelled',
-                refund_amount: refundAmount,
-                refund_status: 'processing',
-                refund_details: req.body && req.body.refundDetails ? req.body.refundDetails : null,
-                cancelled_timestamp: localCancelTimestamp,
-                refund_deduction: deductionAmount
-            })
-            .eq('id', bookingId)
-            .select('*, users:user_id(*)')
-            .single();
-
-        if (updateError) {
-            console.error('Error updating booking:', updateError);
-            return res.status(500).json({ error: 'Error updating booking status' });
-        }
-
-        // Update vehicle availability back to true
-        if (booking.vehicle_id && booking.vehicle_type) {
-            let vehicleTable = booking.vehicle_type;
-            if (vehicleTable === 'car') vehicleTable = 'cars';
-            if (vehicleTable === 'bike') vehicleTable = 'bikes';
-
-            const { error: vehicleError } = await supabase
-                .from(vehicleTable)
-                .update({ is_available: true })
-                .eq('id', booking.vehicle_id);
-
-            if (vehicleError) {
-                console.error('Error updating vehicle:', vehicleError);
-            }
-        }
-
-        console.log('Booking cancelled successfully:', updatedBooking);
-
-        res.json({
-            message: 'Booking cancelled successfully',
-            refundAmount,
-            booking: updatedBooking
-        });
-
-    } catch (error) {
-        console.error('Error cancelling booking:', error);
-        res.status(500).json({ error: 'Error cancelling booking' });
-    }
-});
-
-// Endpoint for user to submit refund details for a rejected booking
-app.post('/api/bookings/:id/refund-details', verifyToken, async (req, res) => {
-    try {
-        const bookingId = parseInt(req.params.id);
-        const userId = req.user.id;
-
-        // Fetch the booking
-        const { data: booking, error: fetchError } = await supabase
-            .from('bookings')
-            .select('*')
-            .eq('id', bookingId)
-            .eq('user_id', userId)
-            .single();
-
-        if (fetchError) {
-            console.error('Fetch error in refund-details endpoint:', fetchError);
-            return res.status(500).json({ error: 'Error fetching booking details' });
-        }
-        if (!booking) {
-            return res.status(404).json({ error: 'Booking not found or unauthorized' });
-        }
-        if (booking.status !== 'rejected') {
-            return res.status(400).json({ error: 'Refund details can only be submitted for rejected bookings' });
-        }
-        if (!req.body || !req.body.refundDetails) {
-            return res.status(400).json({ error: 'Missing refund details' });
-        }
-
-        // Set refund_amount and refundAmount to full advance payment (default 100 if not set)
-        const advancePayment = booking.advance_payment || booking.advancePayment || 100;
-
-        // Update the booking with refund details, refund amount, and set refund_status to 'processing'
-        const { data: updatedBooking, error: updateError } = await supabase
-            .from('bookings')
-            .update({
-                refund_details: req.body.refundDetails,
-                refund_amount: advancePayment,
-                refund_status: 'processing',
-                refund_deduction: 0 // Set deduction to 0 for rejected refunds (change if needed)
-            })
-            .eq('id', bookingId)
-            .select('*')
-            .single();
-
-        if (updateError) {
-            console.error('Update error in refund-details endpoint:', updateError);
-            return res.status(500).json({ error: 'Error updating refund details' });
-        }
-
-        res.json({ message: 'Refund details submitted successfully', booking: updatedBooking });
-    } catch (error) {
-        console.error('Catch error in refund-details endpoint:', error);
-        res.status(500).json({ error: 'Error submitting refund details', details: error.message });
-    }
-});
-
-// Forgot Password: Request OTP
-app.post('/api/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
-        }
-
-        // Check if user exists
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('id, email, full_name')
-            .eq('email', email)
-            .single();
-
-        if (userError || !user) {
-            return res.status(404).json({ error: 'User not found with this email' });
-        }
-
-        // Generate OTP
-        const otp = generateOTP();
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-
-        // Store OTP in database (you might want to create a separate table for this)
-        const { error: otpError } = await supabase
-            .from('password_reset_otps')
-            .upsert({
-                user_id: user.id,
-                email: user.email,
-                otp: otp,
-                expires_at: otpExpiry.toISOString(),
-                created_at: new Date().toISOString()
-            });
-
-        if (otpError) {
-            console.error('Error storing OTP:', otpError);
-            return res.status(500).json({ error: 'Error generating OTP' });
-        }
-
-        // Send OTP email
-        const emailResult = await sendPasswordResetOTP(user.email, user.full_name, otp);
-
-        if (emailResult.success) {
-            res.json({ message: 'OTP sent successfully to your email' });
-        } else {
-            console.error('Failed to send OTP email:', emailResult.error);
-            res.status(500).json({ error: 'Failed to send OTP email' });
-        }
-
-    } catch (error) {
-        console.error('Error in forgot password:', error);
-        res.status(500).json({ error: 'Error processing forgot password request' });
-    }
-});
-
-// Admin forgot password: only send OTP if the email belongs to an admin user
-app.post('/api/admin/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body;
-
-        if (!email) return res.status(400).json({ error: 'Email is required' });
-
-        // Normalize email
-        const normalized = String(email).trim().toLowerCase();
-
-        // First check if there's an 'admins' table (preferred) — if not fall back to 'users' with is_admin flag
-        let { data: adminRow, error: adminErr } = await supabase
-            .from('admins')
-            .select('id, email, full_name')
-            .eq('email', normalized)
-            .maybeSingle();
-
-        if (adminErr && adminErr.code !== 'PGRST116') {
-            // PGRST116 sometimes indicates no such table — ignore and fall back
-            console.error('Error while checking admins table:', adminErr);
-            // continue to fallback check
-            adminRow = null;
-        }
-
-        if (!adminRow) {
-            // fallback: check users table for is_admin=true
-            const { data: userRow, error: userErr } = await supabase
-                .from('users')
-                .select('id, email, full_name, is_admin')
-                .eq('email', normalized)
-                .single();
-
-            if (userErr || !userRow || !userRow.is_admin) {
-                return res.status(404).json({ error: 'This email is not registered as admin' });
-            }
-            adminRow = userRow; // treat as admin
-        }
-
-        // At this point, we have an adminRow — generate OTP and persist to password_reset_otps
-        const otp = generateOTP();
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-        // Upsert OTP record, associate user_id when available
-        const { error: otpError } = await supabase.from('password_reset_otps').upsert({
-            user_id: adminRow.id || null,
-            email: adminRow.email,
-            otp: otp,
-            expires_at: otpExpiry,
-            created_at: new Date().toISOString()
-        });
-
-        if (otpError) {
-            console.error('Error storing admin OTP:', otpError);
-            return res.status(500).json({ error: 'Error generating OTP for admin' });
-        }
-
-        // Send OTP email to admin
-        const emailResult = await sendPasswordResetOTP(adminRow.email, adminRow.full_name || 'Admin', otp);
-        if (emailResult.success) {
-            return res.json({ message: 'OTP sent successfully to admin email' });
-        } else {
-            console.error('Failed to send admin OTP email:', emailResult.error);
-            return res.status(500).json({ error: 'Failed to send OTP email to admin' });
-        }
-    } catch (err) {
-        console.error('Unhandled error in /api/admin/forgot-password:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Forgot Password: Verify OTP and Reset Password
-app.post('/api/reset-password', async (req, res) => {
-    try {
-        const { email, otp, newPassword } = req.body;
-
-        if (!email || !otp) {
-            return res.status(400).json({ error: 'Email and OTP are required' });
-        }
-
-        // Verify OTP
-        const { data: otpRecord, error: otpError } = await supabase
-            .from('password_reset_otps')
-            .select('*')
-            .eq('email', email)
-            .eq('otp', otp)
-            .gte('expires_at', new Date().toISOString())
-            .single();
-
-        if (otpError || !otpRecord) {
-            return res.status(400).json({ error: 'Invalid or expired OTP' });
-        }
-
-        // If no new password provided, just verify OTP
-        if (!newPassword) {
-            res.json({ message: 'OTP verified successfully' });
-            return;
-        }
-
-        // Fetch user to check existing password (by user_id if available, else by email)
-        let userRow = null;
-        if (otpRecord.user_id) {
-            const { data, error } = await supabase.from('users').select('id, password').eq('id', otpRecord.user_id).single();
-            if (!error) userRow = data;
-        } else {
-            const { data, error } = await supabase.from('users').select('id, password').eq('email', email).single();
-            if (!error) userRow = data;
-        }
-
-        // If user found, check that newPassword != old password
-        if (userRow && userRow.password) {
-            const isSame = await bcrypt.compare(newPassword, userRow.password);
-            if (isSame) {
-                return res.status(400).json({ error: 'This is your old password — please choose a different password' });
-            }
-        }
-
-        // Hash new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Update user password
-        let updateResult;
-        if (otpRecord.user_id) {
-            updateResult = await supabase
-                .from('users')
-                .update({ password: hashedPassword })
-                .eq('id', otpRecord.user_id);
-        } else {
-            // fallback: update by email if user_id was not stored
-            updateResult = await supabase
-                .from('users')
-                .update({ password: hashedPassword })
-                .eq('email', email);
-        }
-
-        if (updateResult.error) {
-            console.error('Error updating password:', updateResult.error);
-            return res.status(500).json({ error: 'Error updating password' });
-        }
-
-        // Delete used OTP
-        await supabase
-            .from('password_reset_otps')
-            .delete()
-            .eq('id', otpRecord.id);
-
-        res.json({ message: 'Password reset successfully' });
-
-    } catch (error) {
-        console.error('Error in reset password:', error);
-        res.status(500).json({ error: 'Error resetting password' });
-    }
-});
-
-// Test Retell AI call endpoint (for testing purposes)
-app.post('/api/test/retell-call', verifyAdminToken, async (req, res) => {
-    try {
-        const { phoneNumber } = req.body;
-
-        if (!phoneNumber) {
-            return res.status(400).json({ error: 'Phone number is required' });
-        }
-
-        const testBookingDetails = {
-            bookingId: 'TEST123',
-            vehicleName: 'Test Vehicle',
-            vehicleType: 'bike',
-            startDate: '2024-01-01',
-            startTime: '10:00',
-            duration: 2,
-            totalAmount: 500,
-            advancePayment: 100,
-            remainingAmount: 400,
-            userName: 'Test User'
-        };
-
-        console.log('🧪 Testing Retell AI call to:', phoneNumber);
-        const callResult = await makeBookingConfirmationCall(phoneNumber, testBookingDetails);
-
-        if (callResult.success) {
-            res.json({
-                success: true,
-                message: 'Test call initiated successfully',
-                callId: callResult.callId,
-                data: callResult.data
-            });
-        } else {
-            res.status(500).json({
-                success: false,
-                error: callResult.error,
-                details: callResult.details
-            });
-        }
-    } catch (error) {
-        console.error('Error testing Retell AI call:', error);
-        res.status(500).json({ error: 'Error testing call', details: error.message });
-    }
-});
-
-// Temporary email test endpoint (remove in production)
-app.get('/test-email', async (req, res) => {
-    try {
-        const { sendPasswordResetOTP } = require('./config/emailService');
-        const testEmail = process.env.EMAIL_USER || 'test@example.com';
-        const result = await sendPasswordResetOTP(testEmail, 'Test User', '123456');
-        res.json({
-            success: true,
-            message: 'Email test completed',
-            result: result
-        });
-    } catch (error) {
-        console.error('Email test error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            emailConfig: {
-                user: process.env.EMAIL_USER ? 'Set' : 'Not set',
-                pass: process.env.EMAIL_PASS ? 'Set' : 'Not set'
+        // Admin Registration
+        app.post('/api/register/admin', async (req, res) => {
+            try {
+                const { adminName, email, adminId, password, confirmPassword, securityCode, otp } = req.body;
+
+                if (securityCode !== '1575') {
+                    return res.status(403).json({ error: 'Invalid Security Code. You are not authorized to register as admin.' });
+                }
+
+                const existingUser = await SupabaseDB.getUserByEmail(email);
+                if (existingUser) {
+                    return res.status(400).json({ error: 'Email already exists' });
+                }
+
+                // Verify OTP exists and not expired
+                if (!otp) {
+                    return res.status(400).json({ error: 'OTP required to complete registration' });
+                }
+
+                const { data: otpRecord, error: otpError } = await supabase
+                    .from('password_reset_otps')
+                    .select('*')
+                    .eq('email', email)
+                    .eq('otp', otp)
+                    .gte('expires_at', new Date().toISOString())
+                    .single();
+
+                if (otpError || !otpRecord) {
+                    return res.status(400).json({ error: 'Invalid or expired OTP' });
+                }
+
+                // Validate passwords
+                if (!confirmPassword) return res.status(400).json({ error: 'Please confirm your password' });
+                if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
+
+                const { valid, errors } = validatePassword(password);
+                if (!valid) return res.status(400).json({ error: 'Password validation failed', details: errors });
+
+                const hashedPassword = await bcrypt.hash(password, 10);
+                const newAdmin = {
+                    admin_name: adminName,
+                    email,
+                    admin_id: adminId,
+                    password: hashedPassword,
+                    is_admin: true
+                };
+
+                const created = await SupabaseDB.createUser(newAdmin);
+
+                // Delete used OTP record
+                await supabase.from('password_reset_otps').delete().eq('id', otpRecord.id);
+                res.status(201).json({ message: 'Admin registered successfully' });
+            } catch (error) {
+                console.error('Error registering admin:', error);
+                res.status(500).json({ error: 'Error registering admin' });
             }
         });
-    }
-});
 
-// Debug endpoint to help check Supabase connectivity in deployed environments
-// Safe: doesn't leak keys, only reports whether keys are set and attempts a small select
-app.get('/debug/supabase', async (req, res) => {
-    const supabaseUrl = process.env.SUPABASE_URL || null;
-    const anonSet = !!process.env.SUPABASE_ANON_KEY;
-    const serviceRoleSet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        // Debug endpoint to check user data (remove in production)
+        app.get('/api/debug/user/:email', async (req, res) => {
+            try {
+                const { email } = req.params;
+                console.log('🔍 Debug: Checking user data for email:', email);
 
-    try {
-        // Try a simple small select to verify connectivity (table 'bikes' is expected in this app)
-        const { data, error } = await supabase.from('bikes').select('id').limit(1);
-        if (error) throw error;
+                const user = await SupabaseDB.getUserByEmail(email);
+                console.log('📊 Debug: Raw user data:', user);
 
-        return res.json({
-            success: true,
-            supabaseUrl: supabaseUrl ? 'Set' : 'Not set',
-            anonKey: anonSet ? 'Set' : 'Not set',
-            serviceRoleKey: serviceRoleSet ? 'Set' : 'Not set',
-            sample: data || []
+                if (!user) {
+                    return res.json({ error: 'User not found', email });
+                }
+
+                // Show both raw and mapped data
+                const mappedUser = {
+                    id: user.id,
+                    fullName: user.full_name,
+                    adminName: user.admin_name,
+                    email: user.email,
+                    phoneNumber: user.phone_number,
+                    isAdmin: user.is_admin || false
+                };
+
+                res.json({
+                    raw: user,
+                    mapped: mappedUser,
+                    fields: {
+                        hasFullName: !!user.full_name,
+                        hasAdminName: !!user.admin_name,
+                        hasEmail: !!user.email,
+                        isAdmin: user.is_admin
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Debug endpoint error:', error);
+                res.status(500).json({ error: 'Debug endpoint error', details: error.message });
+            }
         });
-    } catch (err) {
-        // Provide helpful diagnostic info without returning secret values
-        return res.status(500).json({
-            success: false,
 
+        // User Login
+        app.post('/api/login', async (req, res) => {
+            try {
+                const { email, password } = req.body;
+                console.log('🔍 Login attempt for email:', email);
+
+                const user = await SupabaseDB.getUserByEmail(email);
+                console.log('📊 Raw user data from Supabase:', user);
+
+                if (!user) {
+                    console.log('❌ User not found');
+                    return res.status(401).json({ error: 'Invalid email or password' });
+                }
+
+                const validPassword = await bcrypt.compare(password, user.password);
+                if (!validPassword) {
+                    console.log('❌ Invalid password');
+                    return res.status(401).json({ error: 'Invalid email or password' });
+                }
+
+                const token = jwt.sign(
+                    { id: user.id, email: user.email, isAdmin: user.is_admin },
+                    JWT_SECRET
+                );
+
+                // Map snake_case to camelCase for frontend compatibility
+                const userResponse = {
+                    id: user.id,
+                    fullName: user.full_name,
+                    adminName: user.admin_name,
+                    email: user.email,
+                    phoneNumber: user.phone_number,
+                    isAdmin: user.is_admin || false
+                };
+
+                console.log('🎯 Mapped user response:', userResponse);
+                console.log('✅ Login successful for:', userResponse.fullName || userResponse.adminName || userResponse.email);
+
+                res.json({ token, user: userResponse });
+            } catch (error) {
+                console.error('❌ Error during login:', error);
+                res.status(500).json({ error: 'Error during login' });
+            }
         });
-    }
-});
 
-// SOS Activation Endpoint
-app.post('/api/sos-activate', async (req, res) => {
-    try {
-        const { token, bookingId, gpsLocation } = req.body;
+        // Admin Login
+        app.post('/api/login/admin', async (req, res) => {
+            try {
+                const { email, password, adminId } = req.body;
+                // Find the admin by email
+                const admin = await SupabaseDB.getUserByEmail(email);
+                if (!admin || !admin.is_admin || admin.admin_id !== adminId) {
+                    return res.status(401).json({ error: 'Invalid admin credentials' });
+                }
+                const validPassword = await bcrypt.compare(password, admin.password);
+                if (!validPassword) {
+                    return res.status(401).json({ error: 'Invalid admin credentials' });
+                }
+                const token = jwt.sign(
+                    { id: admin.id, email: admin.email, isAdmin: admin.is_admin },
+                    JWT_SECRET
+                );
 
-        // Basic validation
-        if (!bookingId) {
-            return res.status(400).json({ error: 'Booking ID is required' });
-        }
+                // Map snake_case to camelCase for frontend compatibility
+                const adminResponse = {
+                    id: admin.id,
+                    fullName: admin.full_name,
+                    adminName: admin.admin_name,
+                    email: admin.email,
+                    phoneNumber: admin.phone_number,
+                    adminId: admin.admin_id,
+                    isAdmin: admin.is_admin || false
+                };
 
-        // Fetch booking details with user info
-        const { data: booking, error: bookingError } = await supabase
-            .from('bookings')
-            .select(`
+                res.json({ token, admin: adminResponse });
+            } catch (error) {
+                console.error('Error during admin login:', error);
+                res.status(500).json({ error: 'Error during admin login' });
+            }
+        });
+
+        // Get all vehicles
+        app.get('/api/vehicles/:type', async (req, res) => {
+            const { type } = req.params;
+            try {
+                const vehicles = await SupabaseDB.getVehicles(type);
+                res.json(vehicles);
+            } catch (error) {
+                console.error(`Error fetching ${type}:`, error);
+                res.status(500).json({ error: `Error fetching ${type}` });
+            }
+        });
+
+        // Get a specific vehicle by type and ID
+        app.get('/api/vehicles/:type/:id', async (req, res) => {
+            try {
+                let { type, id } = req.params;
+                console.log('Requested type:', type, 'Requested id:', id);
+                if (type === 'car') type = 'cars';
+                if (type === 'bike') type = 'bikes';
+                if (type === 'scooty') type = 'scooty';
+                console.log('Mapped type:', type, 'ID:', id);
+                const vehicle = await SupabaseDB.getVehicleById(type, id);
+                console.log('Vehicle result:', vehicle);
+                if (!vehicle) {
+                    return res.status(404).json({ error: 'Vehicle not found' });
+                }
+                res.json(vehicle);
+            } catch (error) {
+                console.error(`Error fetching vehicle:`, error);
+                res.status(500).json({ error: 'Error fetching vehicle' });
+            }
+        });
+
+        // Create booking
+        app.post('/api/bookings', authenticateToken, async (req, res) => {
+            try {
+                console.log('--- Booking Request Received ---');
+                console.log('User:', req.user);
+                console.log('Body:', req.body);
+                const { vehicleId, startDate, startTime, duration, vehicleType, transactionId } = req.body;
+                // Validate time format (HH:mm)
+                const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                if (!timeRegex.test(startTime)) {
+                    return res.status(400).json({ error: 'Invalid time format. Please use HH:mm format (24-hour)' });
+                }
+                // Convert startTime to 24-hour format if needed
+                const [hours, minutes] = startTime.split(':').map(Number);
+                const formattedStartTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                // Check for time conflicts
+                const conflict = await checkTimeConflict(vehicleId, startDate, formattedStartTime, duration);
+                if (conflict.conflict) {
+                    return res.status(409).json(conflict);
+                }
+                const bookingData = {
+                    user_id: req.user.id,
+                    vehicle_id: vehicleId,
+                    start_date: startDate,
+                    start_time: formattedStartTime, // Use formatted time
+                    duration,
+                    status: 'pending',
+                    vehicle_type: vehicleType,
+                    transaction_id: transactionId
+                };
+                console.log('Booking data to insert:', bookingData);
+                const { data, error } = await supabase
+                    .from('bookings')
+                    .insert([bookingData])
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('Error creating booking:', error);
+                    return res.status(500).json({ error: 'Error creating booking', details: error.message || error });
+                }
+
+                console.log('Booking created:', data);
+                // Update vehicle availability
+                try {
+                    await SupabaseDB.updateVehicleAvailability(vehicleType, vehicleId, false);
+                } catch (vehicleError) {
+                    console.error('Error updating vehicle availability:', vehicleError);
+                    // Optionally, you can add a warning to the response here
+                }
+                res.status(201).json(data);
+            } catch (error) {
+                console.error('Error creating booking:', error);
+                res.status(500).json({ error: 'Error creating booking', details: error.message || error });
+            }
+        });
+
+        // Get user bookings
+        app.get('/api/bookings/user', authenticateToken, async (req, res) => {
+            try {
+                const bookings = await SupabaseDB.getBookingsByUser(req.user.id);
+                res.json(bookings);
+            } catch (error) {
+                console.error('Error fetching user bookings:', error);
+                res.status(500).json({ error: 'Error fetching bookings' });
+            }
+        });
+
+        // Dashboard Stats
+        app.get('/api/dashboard-stats', async (req, res) => {
+            try {
+                // Total vehicles = bikes + cars + scooty
+                const { count: bikeCount } = await supabase.from('bikes').select('id', { count: 'exact', head: true });
+                const { count: carCount } = await supabase.from('cars').select('id', { count: 'exact', head: true });
+                const { count: scootyCount } = await supabase.from('scooty').select('id', { count: 'exact', head: true });
+                const totalVehicles = (bikeCount || 0) + (carCount || 0) + (scootyCount || 0);
+
+                // Users
+                const { count: activeUsers } = await supabase.from('users').select('id', { count: 'exact', head: true });
+
+                // Bookings
+                const { count: totalBookingsMonth } = await supabase
+                    .from('bookings')
+                    .select('id', { count: 'exact', head: true })
+                    .gte('start_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+
+                const { count: pendingBookings } = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+                const { count: confirmedBookings } = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'confirmed');
+                const { count: cancelledBookings } = await supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'cancelled');
+                const { count: pendingRefunds } = await supabase
+                    .from('bookings')
+                    .select('id', { count: 'exact', head: true })
+                    .in('status', ['cancelled', 'rejected'])
+                    .eq('refund_status', 'processing');
+
+                // Today's bookings
+                const today = new Date().toISOString().split('T')[0];
+                const { count: todaysBookings } = await supabase
+                    .from('bookings')
+                    .select('id', { count: 'exact', head: true })
+                    .gte('created_at', today + 'T00:00:00')
+                    .lt('created_at', today + 'T23:59:59');
+
+                res.json({
+                    totalVehicles,
+                    totalBookingsMonth,
+                    activeUsers,
+                    pendingBookings,
+                    confirmedBookings,
+                    cancelledBookings,
+                    pendingRefunds,
+                    todaysBookings
+                });
+            } catch (error) {
+                console.error('Error fetching dashboard stats:', error);
+                res.status(500).json({ error: 'Error fetching dashboard stats' });
+            }
+        });
+
+        // Admin: Get all users
+        app.get('/api/admin/users', async (req, res) => {
+            try {
+                const { data, error } = await supabase.from('users').select('*');
+                if (error) throw error;
+                // Map snake_case to camelCase for frontend compatibility
+                const mapped = (data || []).map(u => ({
+                    id: u.id,
+                    fullName: u.full_name,
+                    adminName: u.admin_name,
+                    email: u.email,
+                    phoneNumber: u.phone_number,
+                    isAdmin: u.is_admin,
+                    isBlocked: u.is_blocked
+                }));
+                res.json(mapped);
+            } catch (error) {
+                console.error('Error fetching admin users:', error);
+                res.status(500).json({ error: 'Error fetching admin users' });
+            }
+        });
+
+        // Admin: Get all vehicles
+        app.get('/api/admin/vehicles', async (req, res) => {
+            try {
+                const bikes = await supabase.from('bikes').select('*');
+                const cars = await supabase.from('cars').select('*');
+                const scooty = await supabase.from('scooty').select('*');
+                const allVehicles = [
+                    ...(bikes.data || []).map(v => ({ ...v, type: 'bike' })),
+                    ...(cars.data || []).map(v => ({ ...v, type: 'car' })),
+                    ...(scooty.data || []).map(v => ({ ...v, type: 'scooty' }))
+                ];
+                res.json(allVehicles);
+            } catch (error) {
+                console.error('Error fetching admin vehicles:', error);
+                res.status(500).json({ error: 'Error fetching admin vehicles' });
+            }
+        });
+
+        // Admin: Get single user
+        app.get('/api/admin/users/:id', async (req, res) => {
+            try {
+                const { data, error } = await supabase.from('users').select('*').eq('id', req.params.id).single();
+                if (error) throw error;
+                // Map snake_case to camelCase
+                const user = {
+                    id: data.id,
+                    fullName: data.full_name,
+                    adminName: data.admin_name,
+                    email: data.email,
+                    phoneNumber: data.phone_number,
+                    isAdmin: data.is_admin,
+                    isBlocked: data.is_blocked,
+                    createdAt: data.created_at
+                };
+                res.json(user);
+            } catch (error) {
+                console.error('Error fetching user:', error);
+                res.status(500).json({ error: 'Error fetching user' });
+            }
+        });
+
+        // Admin: Update user
+        app.put('/api/admin/users/:id', async (req, res) => {
+            try {
+                const { fullName, email, phoneNumber } = req.body;
+                const { data, error } = await supabase.from('users').update({ full_name: fullName, email, phone_number: phoneNumber }).eq('id', req.params.id).select().single();
+                if (error) throw error;
+                res.json(data);
+            } catch (error) {
+                console.error('Error updating user:', error);
+                res.status(500).json({ error: 'Error updating user' });
+            }
+        });
+
+        // Admin: Block/Unblock user
+        app.patch('/api/admin/users/:id/block', async (req, res) => {
+            try {
+                const { isBlocked } = req.body;
+                const { data, error } = await supabase.from('users').update({ is_blocked: isBlocked }).eq('id', req.params.id).select().single();
+                if (error) throw error;
+                res.json(data);
+            } catch (error) {
+                console.error('Error updating user status:', error);
+                res.status(500).json({ error: 'Error updating user status' });
+            }
+        });
+
+        // Admin: Get single vehicle
+        app.get('/api/admin/vehicles/:type/:id', async (req, res) => {
+            try {
+                let { type, id } = req.params;
+                if (type === 'car') type = 'cars';
+                if (type === 'bike') type = 'bikes';
+                if (type === 'scooty') type = 'scooty';
+                const { data, error } = await supabase.from(type).select('*').eq('id', id).single();
+                if (error) throw error;
+                res.json(data);
+            } catch (error) {
+                console.error('Error fetching vehicle:', error);
+                res.status(500).json({ error: 'Error fetching vehicle' });
+            }
+        });
+
+        // Admin: Update vehicle
+        app.put('/api/admin/vehicles/:type/:id', async (req, res) => {
+            try {
+                let { type, id } = req.params;
+                if (type === 'car') type = 'cars';
+                if (type === 'bike') type = 'bikes';
+                if (type === 'scooty') type = 'scooty';
+                const { data, error } = await supabase.from(type).update(req.body).eq('id', id).select().single();
+                if (error) throw error;
+                res.json(data);
+            } catch (error) {
+                console.error('Error updating vehicle:', error);
+                res.status(500).json({ error: 'Error updating vehicle' });
+            }
+        });
+
+        // Admin: Delete vehicle
+        app.delete('/api/admin/vehicles/:type/:id', async (req, res) => {
+            try {
+                let { type, id } = req.params;
+                if (type === 'car') type = 'cars';
+                if (type === 'bike') type = 'bikes';
+                if (type === 'scooty') type = 'scooty';
+                const { error } = await supabase.from(type).delete().eq('id', id);
+                if (error) throw error;
+                res.json({ message: 'Vehicle deleted successfully' });
+            } catch (error) {
+                console.error('Error deleting vehicle:', error);
+                res.status(500).json({ error: 'Error deleting vehicle' });
+            }
+        });
+
+        // Admin: Get policies
+        app.get('/api/admin/policies', async (req, res) => {
+            try {
+                const { data, error } = await supabase.from('policies').select('*');
+                if (error) throw error;
+                res.json(data || []);
+            } catch (error) {
+                console.error('Error fetching policies:', error);
+                res.status(500).json({ error: 'Error fetching policies' });
+            }
+        });
+
+        // Admin: Add new vehicle
+        app.post('/api/admin/vehicles/:type', async (req, res) => {
+            try {
+                let { type } = req.params;
+                if (type === 'car') type = 'cars';
+                if (type === 'bike') type = 'bikes';
+                if (type === 'scooty') type = 'scooty';
+
+                const { data, error } = await supabase
+                    .from(type)
+                    .insert([req.body])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                res.status(201).json(data);
+            } catch (error) {
+                console.error('Error adding vehicle:', error);
+                res.status(500).json({ error: 'Error adding vehicle' });
+            }
+        });
+
+        // User: Cancel their own booking
+        app.post('/api/bookings/:id/cancel', verifyToken, async (req, res) => {
+            try {
+                const bookingId = parseInt(req.params.id);
+                const userId = req.user.id;
+                console.log('Processing user booking cancellation for ID:', bookingId);
+
+                // First, fetch the booking
+                const { data: booking, error: fetchError } = await supabase
+                    .from('bookings')
+                    .select('*, users:user_id(*)')
+                    .eq('id', bookingId)
+                    .eq('user_id', userId) // Ensure the booking belongs to the user
+                    .single();
+
+                if (fetchError) {
+                    console.error('Error fetching booking:', fetchError);
+                    return res.status(500).json({ error: 'Error fetching booking details' });
+                }
+
+                if (!booking) {
+                    return res.status(404).json({ error: 'Booking not found or unauthorized' });
+                }
+
+                if (booking.status !== 'confirmed') {
+                    return res.status(400).json({ error: 'Only confirmed bookings can be cancelled' });
+                }
+
+                // Calculate refund amount based on time since confirmation
+                const now = new Date();
+                const confirmationTime = booking.confirmation_timestamp ? new Date(booking.confirmation_timestamp) : now;
+                const hoursSinceConfirmation = (now - confirmationTime) / (1000 * 60 * 60);
+
+                console.log('Booking cancellation debug:', {
+                    confirmation_timestamp: booking.confirmation_timestamp,
+                    now: new Date().toISOString(),
+                    advance_payment: booking.advance_payment
+                });
+
+                let refundAmount = 0;
+                // Calculate refund based on advance payment only
+                const advancePayment = parseFloat(booking.advance_payment) || 100; // Default to 100 if not set
+                if (hoursSinceConfirmation <= 2) {
+                    // Full refund of advance payment
+                    refundAmount = advancePayment;
+                } else {
+                    // 70% refund of advance payment
+                    refundAmount = Math.round(advancePayment * 0.7);
+                }
+
+                console.log('hoursSinceConfirmation:', hoursSinceConfirmation);
+
+                // Calculate deduction
+                let deductionAmount = 0;
+                if (hoursSinceConfirmation > 2) {
+                    deductionAmount = Math.round(advancePayment * 0.3);
+                }
+                // Use local time for cancelled_timestamp
+                const nowCancel = new Date();
+                const localCancelTimestamp = nowCancel.getFullYear() + '-' +
+                    String(nowCancel.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(nowCancel.getDate()).padStart(2, '0') + ' ' +
+                    String(nowCancel.getHours()).padStart(2, '0') + ':' +
+                    String(nowCancel.getMinutes()).padStart(2, '0') + ':' +
+                    String(nowCancel.getSeconds()).padStart(2, '0');
+                // Update booking status to cancelled with refund details, timestamps, and deduction
+                const { data: updatedBooking, error: updateError } = await supabase
+                    .from('bookings')
+                    .update({
+                        status: 'cancelled',
+                        refund_amount: refundAmount,
+                        refund_status: 'processing',
+                        refund_details: req.body && req.body.refundDetails ? req.body.refundDetails : null,
+                        cancelled_timestamp: localCancelTimestamp,
+                        refund_deduction: deductionAmount
+                    })
+                    .eq('id', bookingId)
+                    .select('*, users:user_id(*)')
+                    .single();
+
+                if (updateError) {
+                    console.error('Error updating booking:', updateError);
+                    return res.status(500).json({ error: 'Error updating booking status' });
+                }
+
+                // Update vehicle availability back to true
+                if (booking.vehicle_id && booking.vehicle_type) {
+                    let vehicleTable = booking.vehicle_type;
+                    if (vehicleTable === 'car') vehicleTable = 'cars';
+                    if (vehicleTable === 'bike') vehicleTable = 'bikes';
+
+                    const { error: vehicleError } = await supabase
+                        .from(vehicleTable)
+                        .update({ is_available: true })
+                        .eq('id', booking.vehicle_id);
+
+                    if (vehicleError) {
+                        console.error('Error updating vehicle:', vehicleError);
+                    }
+                }
+
+                console.log('Booking cancelled successfully:', updatedBooking);
+
+                res.json({
+                    message: 'Booking cancelled successfully',
+                    refundAmount,
+                    booking: updatedBooking
+                });
+
+            } catch (error) {
+                console.error('Error cancelling booking:', error);
+                res.status(500).json({ error: 'Error cancelling booking' });
+            }
+        });
+
+        // Endpoint for user to submit refund details for a rejected booking
+        app.post('/api/bookings/:id/refund-details', verifyToken, async (req, res) => {
+            try {
+                const bookingId = parseInt(req.params.id);
+                const userId = req.user.id;
+
+                // Fetch the booking
+                const { data: booking, error: fetchError } = await supabase
+                    .from('bookings')
+                    .select('*')
+                    .eq('id', bookingId)
+                    .eq('user_id', userId)
+                    .single();
+
+                if (fetchError) {
+                    console.error('Fetch error in refund-details endpoint:', fetchError);
+                    return res.status(500).json({ error: 'Error fetching booking details' });
+                }
+                if (!booking) {
+                    return res.status(404).json({ error: 'Booking not found or unauthorized' });
+                }
+                if (booking.status !== 'rejected') {
+                    return res.status(400).json({ error: 'Refund details can only be submitted for rejected bookings' });
+                }
+                if (!req.body || !req.body.refundDetails) {
+                    return res.status(400).json({ error: 'Missing refund details' });
+                }
+
+                // Set refund_amount and refundAmount to full advance payment (default 100 if not set)
+                const advancePayment = booking.advance_payment || booking.advancePayment || 100;
+
+                // Update the booking with refund details, refund amount, and set refund_status to 'processing'
+                const { data: updatedBooking, error: updateError } = await supabase
+                    .from('bookings')
+                    .update({
+                        refund_details: req.body.refundDetails,
+                        refund_amount: advancePayment,
+                        refund_status: 'processing',
+                        refund_deduction: 0 // Set deduction to 0 for rejected refunds (change if needed)
+                    })
+                    .eq('id', bookingId)
+                    .select('*')
+                    .single();
+
+                if (updateError) {
+                    console.error('Update error in refund-details endpoint:', updateError);
+                    return res.status(500).json({ error: 'Error updating refund details' });
+                }
+
+                res.json({ message: 'Refund details submitted successfully', booking: updatedBooking });
+            } catch (error) {
+                console.error('Catch error in refund-details endpoint:', error);
+                res.status(500).json({ error: 'Error submitting refund details', details: error.message });
+            }
+        });
+
+        // Forgot Password: Request OTP
+        app.post('/api/forgot-password', async (req, res) => {
+            try {
+                const { email } = req.body;
+
+                if (!email) {
+                    return res.status(400).json({ error: 'Email is required' });
+                }
+
+                // Check if user exists
+                const { data: user, error: userError } = await supabase
+                    .from('users')
+                    .select('id, email, full_name')
+                    .eq('email', email)
+                    .single();
+
+                if (userError || !user) {
+                    return res.status(404).json({ error: 'User not found with this email' });
+                }
+
+                // Generate OTP
+                const otp = generateOTP();
+                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+                // Store OTP in database (you might want to create a separate table for this)
+                const { error: otpError } = await supabase
+                    .from('password_reset_otps')
+                    .upsert({
+                        user_id: user.id,
+                        email: user.email,
+                        otp: otp,
+                        expires_at: otpExpiry.toISOString(),
+                        created_at: new Date().toISOString()
+                    });
+
+                if (otpError) {
+                    console.error('Error storing OTP:', otpError);
+                    return res.status(500).json({ error: 'Error generating OTP' });
+                }
+
+                // Send OTP email
+                const emailResult = await sendPasswordResetOTP(user.email, user.full_name, otp);
+
+                if (emailResult.success) {
+                    res.json({ message: 'OTP sent successfully to your email' });
+                } else {
+                    console.error('Failed to send OTP email:', emailResult.error);
+                    res.status(500).json({ error: 'Failed to send OTP email' });
+                }
+
+            } catch (error) {
+                console.error('Error in forgot password:', error);
+                res.status(500).json({ error: 'Error processing forgot password request' });
+            }
+        });
+
+        // Admin forgot password: only send OTP if the email belongs to an admin user
+        app.post('/api/admin/forgot-password', async (req, res) => {
+            try {
+                const { email } = req.body;
+
+                if (!email) return res.status(400).json({ error: 'Email is required' });
+
+                // Normalize email
+                const normalized = String(email).trim().toLowerCase();
+
+                // First check if there's an 'admins' table (preferred) — if not fall back to 'users' with is_admin flag
+                let { data: adminRow, error: adminErr } = await supabase
+                    .from('admins')
+                    .select('id, email, full_name')
+                    .eq('email', normalized)
+                    .maybeSingle();
+
+                if (adminErr && adminErr.code !== 'PGRST116') {
+                    // PGRST116 sometimes indicates no such table — ignore and fall back
+                    console.error('Error while checking admins table:', adminErr);
+                    // continue to fallback check
+                    adminRow = null;
+                }
+
+                if (!adminRow) {
+                    // fallback: check users table for is_admin=true
+                    const { data: userRow, error: userErr } = await supabase
+                        .from('users')
+                        .select('id, email, full_name, is_admin')
+                        .eq('email', normalized)
+                        .single();
+
+                    if (userErr || !userRow || !userRow.is_admin) {
+                        return res.status(404).json({ error: 'This email is not registered as admin' });
+                    }
+                    adminRow = userRow; // treat as admin
+                }
+
+                // At this point, we have an adminRow — generate OTP and persist to password_reset_otps
+                const otp = generateOTP();
+                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+                // Upsert OTP record, associate user_id when available
+                const { error: otpError } = await supabase.from('password_reset_otps').upsert({
+                    user_id: adminRow.id || null,
+                    email: adminRow.email,
+                    otp: otp,
+                    expires_at: otpExpiry,
+                    created_at: new Date().toISOString()
+                });
+
+                if (otpError) {
+                    console.error('Error storing admin OTP:', otpError);
+                    return res.status(500).json({ error: 'Error generating OTP for admin' });
+                }
+
+                // Send OTP email to admin
+                const emailResult = await sendPasswordResetOTP(adminRow.email, adminRow.full_name || 'Admin', otp);
+                if (emailResult.success) {
+                    return res.json({ message: 'OTP sent successfully to admin email' });
+                } else {
+                    console.error('Failed to send admin OTP email:', emailResult.error);
+                    return res.status(500).json({ error: 'Failed to send OTP email to admin' });
+                }
+            } catch (err) {
+                console.error('Unhandled error in /api/admin/forgot-password:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+        });
+
+        // Forgot Password: Verify OTP and Reset Password
+        app.post('/api/reset-password', async (req, res) => {
+            try {
+                const { email, otp, newPassword } = req.body;
+
+                if (!email || !otp) {
+                    return res.status(400).json({ error: 'Email and OTP are required' });
+                }
+
+                // Verify OTP
+                const { data: otpRecord, error: otpError } = await supabase
+                    .from('password_reset_otps')
+                    .select('*')
+                    .eq('email', email)
+                    .eq('otp', otp)
+                    .gte('expires_at', new Date().toISOString())
+                    .single();
+
+                if (otpError || !otpRecord) {
+                    return res.status(400).json({ error: 'Invalid or expired OTP' });
+                }
+
+                // If no new password provided, just verify OTP
+                if (!newPassword) {
+                    res.json({ message: 'OTP verified successfully' });
+                    return;
+                }
+
+                // Fetch user to check existing password (by user_id if available, else by email)
+                let userRow = null;
+                if (otpRecord.user_id) {
+                    const { data, error } = await supabase.from('users').select('id, password').eq('id', otpRecord.user_id).single();
+                    if (!error) userRow = data;
+                } else {
+                    const { data, error } = await supabase.from('users').select('id, password').eq('email', email).single();
+                    if (!error) userRow = data;
+                }
+
+                // If user found, check that newPassword != old password
+                if (userRow && userRow.password) {
+                    const isSame = await bcrypt.compare(newPassword, userRow.password);
+                    if (isSame) {
+                        return res.status(400).json({ error: 'This is your old password — please choose a different password' });
+                    }
+                }
+
+                // Hash new password
+                const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+                // Update user password
+                let updateResult;
+                if (otpRecord.user_id) {
+                    updateResult = await supabase
+                        .from('users')
+                        .update({ password: hashedPassword })
+                        .eq('id', otpRecord.user_id);
+                } else {
+                    // fallback: update by email if user_id was not stored
+                    updateResult = await supabase
+                        .from('users')
+                        .update({ password: hashedPassword })
+                        .eq('email', email);
+                }
+
+                if (updateResult.error) {
+                    console.error('Error updating password:', updateResult.error);
+                    return res.status(500).json({ error: 'Error updating password' });
+                }
+
+                // Delete used OTP
+                await supabase
+                    .from('password_reset_otps')
+                    .delete()
+                    .eq('id', otpRecord.id);
+
+                res.json({ message: 'Password reset successfully' });
+
+            } catch (error) {
+                console.error('Error in reset password:', error);
+                res.status(500).json({ error: 'Error resetting password' });
+            }
+        });
+
+        // Test Retell AI call endpoint (for testing purposes)
+        app.post('/api/test/retell-call', verifyAdminToken, async (req, res) => {
+            try {
+                const { phoneNumber } = req.body;
+
+                if (!phoneNumber) {
+                    return res.status(400).json({ error: 'Phone number is required' });
+                }
+
+                const testBookingDetails = {
+                    bookingId: 'TEST123',
+                    vehicleName: 'Test Vehicle',
+                    vehicleType: 'bike',
+                    startDate: '2024-01-01',
+                    startTime: '10:00',
+                    duration: 2,
+                    totalAmount: 500,
+                    advancePayment: 100,
+                    remainingAmount: 400,
+                    userName: 'Test User'
+                };
+
+                console.log('🧪 Testing Retell AI call to:', phoneNumber);
+                const callResult = await makeBookingConfirmationCall(phoneNumber, testBookingDetails);
+
+                if (callResult.success) {
+                    res.json({
+                        success: true,
+                        message: 'Test call initiated successfully',
+                        callId: callResult.callId,
+                        data: callResult.data
+                    });
+                } else {
+                    res.status(500).json({
+                        success: false,
+                        error: callResult.error,
+                        details: callResult.details
+                    });
+                }
+            } catch (error) {
+                console.error('Error testing Retell AI call:', error);
+                res.status(500).json({ error: 'Error testing call', details: error.message });
+            }
+        });
+
+        // Temporary email test endpoint (remove in production)
+        app.get('/test-email', async (req, res) => {
+            try {
+                const { sendPasswordResetOTP } = require('./config/emailService');
+                const testEmail = process.env.EMAIL_USER || 'test@example.com';
+                const result = await sendPasswordResetOTP(testEmail, 'Test User', '123456');
+                res.json({
+                    success: true,
+                    message: 'Email test completed',
+                    result: result
+                });
+            } catch (error) {
+                console.error('Email test error:', error);
+                res.status(500).json({
+                    success: false,
+                    error: error.message,
+                    emailConfig: {
+                        user: process.env.EMAIL_USER ? 'Set' : 'Not set',
+                        pass: process.env.EMAIL_PASS ? 'Set' : 'Not set'
+                    }
+                });
+            }
+        });
+
+        // Debug endpoint to help check Supabase connectivity in deployed environments
+        // Safe: doesn't leak keys, only reports whether keys are set and attempts a small select
+        app.get('/debug/supabase', async (req, res) => {
+            const supabaseUrl = process.env.SUPABASE_URL || null;
+            const anonSet = !!process.env.SUPABASE_ANON_KEY;
+            const serviceRoleSet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+            try {
+                // Try a simple small select to verify connectivity (table 'bikes' is expected in this app)
+                const { data, error } = await supabase.from('bikes').select('id').limit(1);
+                if (error) throw error;
+
+                return res.json({
+                    success: true,
+                    supabaseUrl: supabaseUrl ? 'Set' : 'Not set',
+                    anonKey: anonSet ? 'Set' : 'Not set',
+                    serviceRoleKey: serviceRoleSet ? 'Set' : 'Not set',
+                    sample: data || []
+                });
+            } catch (err) {
+                // Provide helpful diagnostic info without returning secret values
+                return res.status(500).json({
+                    success: false,
+
+                });
+            }
+        });
+
+        // SOS Activation Endpoint
+        app.post('/api/sos-activate', async (req, res) => {
+            try {
+                const { token, bookingId, gpsLocation } = req.body;
+
+                // Basic validation
+                if (!bookingId) {
+                    return res.status(400).json({ error: 'Booking ID is required' });
+                }
+
+                // Fetch booking details with user info
+                const { data: booking, error: bookingError } = await supabase
+                    .from('bookings')
+                    .select(`
                 *,
                 users:user_id (
                     full_name,
@@ -2331,120 +2320,120 @@ app.post('/api/sos-activate', async (req, res) => {
                     phone_number
                 )
             `)
-            .eq('id', bookingId)
-            .single();
+                    .eq('id', bookingId)
+                    .single();
 
-        if (bookingError || !booking) {
-            console.error('Error fetching booking for SOS:', bookingError);
-            return res.status(404).json({ error: 'Booking not found' });
-        }
+                if (bookingError || !booking) {
+                    console.error('Error fetching booking for SOS:', bookingError);
+                    return res.status(404).json({ error: 'Booking not found' });
+                }
 
-        // Get vehicle details
-        let vehicleName = 'Unknown Vehicle';
+                // Get vehicle details
+                let vehicleName = 'Unknown Vehicle';
 
-        // First, try to get vehicle name directly from booking if it exists
-        if (booking.vehicle_name) {
-            vehicleName = booking.vehicle_name;
-            console.log('Vehicle name from booking:', vehicleName);
-        } else if (booking.vehicle_type && booking.vehicle_id) {
-            // Try to fetch from vehicle tables
-            console.log('Fetching vehicle from DB - Type:', booking.vehicle_type, 'ID:', booking.vehicle_id);
+                // First, try to get vehicle name directly from booking if it exists
+                if (booking.vehicle_name) {
+                    vehicleName = booking.vehicle_name;
+                    console.log('Vehicle name from booking:', vehicleName);
+                } else if (booking.vehicle_type && booking.vehicle_id) {
+                    // Try to fetch from vehicle tables
+                    console.log('Fetching vehicle from DB - Type:', booking.vehicle_type, 'ID:', booking.vehicle_id);
 
-            // Determine correct table name
-            let tableName;
-            if (booking.vehicle_type === 'scooty') {
-                tableName = 'scooty'; // or 'scooties' depending on your schema
-            } else if (booking.vehicle_type === 'bike') {
-                tableName = 'bikes';
-            } else {
-                tableName = booking.vehicle_type + 's'; // Generic pluralization
-            }
+                    // Determine correct table name
+                    let tableName;
+                    if (booking.vehicle_type === 'scooty') {
+                        tableName = 'scooty'; // or 'scooties' depending on your schema
+                    } else if (booking.vehicle_type === 'bike') {
+                        tableName = 'bikes';
+                    } else {
+                        tableName = booking.vehicle_type + 's'; // Generic pluralization
+                    }
 
-            console.log('Querying table:', tableName);
+                    console.log('Querying table:', tableName);
 
-            const { data: vehicle, error: vehicleError } = await supabase
-                .from(tableName)
-                .select('name, model')
-                .eq('id', booking.vehicle_id)
-                .single();
-
-            if (vehicleError) {
-                console.error('Error fetching vehicle:', vehicleError);
-                // Try alternative table name if first attempt fails
-                if (tableName === 'scooty') {
-                    const { data: altVehicle } = await supabase
-                        .from('scooties')
+                    const { data: vehicle, error: vehicleError } = await supabase
+                        .from(tableName)
                         .select('name, model')
                         .eq('id', booking.vehicle_id)
                         .single();
-                    if (altVehicle) {
-                        vehicleName = altVehicle.name || altVehicle.model || 'Unknown Vehicle';
-                        console.log('Vehicle found in scooties table:', vehicleName);
+
+                    if (vehicleError) {
+                        console.error('Error fetching vehicle:', vehicleError);
+                        // Try alternative table name if first attempt fails
+                        if (tableName === 'scooty') {
+                            const { data: altVehicle } = await supabase
+                                .from('scooties')
+                                .select('name, model')
+                                .eq('id', booking.vehicle_id)
+                                .single();
+                            if (altVehicle) {
+                                vehicleName = altVehicle.name || altVehicle.model || 'Unknown Vehicle';
+                                console.log('Vehicle found in scooties table:', vehicleName);
+                            }
+                        }
+                    } else if (vehicle) {
+                        vehicleName = vehicle.name || vehicle.model || 'Unknown Vehicle';
+                        console.log('Vehicle found:', vehicleName);
                     }
+                } else {
+                    console.log('No vehicle_type or vehicle_id in booking');
                 }
-            } else if (vehicle) {
-                vehicleName = vehicle.name || vehicle.model || 'Unknown Vehicle';
-                console.log('Vehicle found:', vehicleName);
+
+
+                // Prepare SOS data
+                let gpsString = 'Not Provided';
+                let googleMapsLink = null;
+
+                if (gpsLocation && typeof gpsLocation === 'object') {
+                    const { latitude, longitude, accuracy } = gpsLocation;
+                    gpsString = `Lat: ${latitude}, Lng: ${longitude} (Accuracy: ${accuracy}m)`;
+                    googleMapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                } else if (typeof gpsLocation === 'string') {
+                    gpsString = gpsLocation;
+                }
+
+                const sosData = {
+                    bookingId: booking.id,
+                    userName: booking.users?.full_name || 'Unknown User',
+                    userEmail: booking.users?.email || 'Unknown Email',
+                    phoneNumber: booking.users?.phone_number || 'Unknown Phone',
+                    bikeModel: vehicleName,
+                    pickupLocation: booking.pickup_location || 'GITA Autonomous College BBSR',
+                    timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                    gpsLocation: gpsString,
+                    googleMapsLink: googleMapsLink
+                };
+
+                // Fetch all admins from database
+                const { data: admins, error: adminError } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('is_admin', true);
+
+                if (adminError) {
+                    console.error('Error fetching admins:', adminError);
+                    // Fallback to hardcoded email if DB fetch fails
+                    await sendSOSAlertEmail(ADMIN_EMAILS[0], sosData);
+                } else if (admins && admins.length > 0) {
+                    // Send email to all admins
+                    const emailPromises = admins.map(admin => sendSOSAlertEmail(admin.email, sosData));
+                    await Promise.all(emailPromises);
+                } else {
+                    console.warn('No admins found in database. Sending to fallback.');
+                    await sendSOSAlertEmail(ADMIN_EMAILS[0], sosData);
+                }
+
+                // Send response immediately, emails sent in background (or awaited above)
+                res.json({ success: true, message: 'SOS alert sent successfully' });
+
+            } catch (error) {
+                console.error('Error processing SOS request:', error);
+                res.status(500).json({ error: 'Internal server error processing SOS' });
             }
-        } else {
-            console.log('No vehicle_type or vehicle_id in booking');
-        }
+        });
 
-
-        // Prepare SOS data
-        let gpsString = 'Not Provided';
-        let googleMapsLink = null;
-
-        if (gpsLocation && typeof gpsLocation === 'object') {
-            const { latitude, longitude, accuracy } = gpsLocation;
-            gpsString = `Lat: ${latitude}, Lng: ${longitude} (Accuracy: ${accuracy}m)`;
-            googleMapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        } else if (typeof gpsLocation === 'string') {
-            gpsString = gpsLocation;
-        }
-
-        const sosData = {
-            bookingId: booking.id,
-            userName: booking.users?.full_name || 'Unknown User',
-            userEmail: booking.users?.email || 'Unknown Email',
-            phoneNumber: booking.users?.phone_number || 'Unknown Phone',
-            bikeModel: vehicleName,
-            pickupLocation: booking.pickup_location || 'GITA Autonomous College BBSR',
-            timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            gpsLocation: gpsString,
-            googleMapsLink: googleMapsLink
-        };
-
-        // Fetch all admins from database
-        const { data: admins, error: adminError } = await supabase
-            .from('users')
-            .select('email')
-            .eq('is_admin', true);
-
-        if (adminError) {
-            console.error('Error fetching admins:', adminError);
-            // Fallback to hardcoded email if DB fetch fails
-            await sendSOSAlertEmail(ADMIN_EMAILS[0], sosData);
-        } else if (admins && admins.length > 0) {
-            // Send email to all admins
-            const emailPromises = admins.map(admin => sendSOSAlertEmail(admin.email, sosData));
-            await Promise.all(emailPromises);
-        } else {
-            console.warn('No admins found in database. Sending to fallback.');
-            await sendSOSAlertEmail(ADMIN_EMAILS[0], sosData);
-        }
-
-        // Send response immediately, emails sent in background (or awaited above)
-        res.json({ success: true, message: 'SOS alert sent successfully' });
-
-    } catch (error) {
-        console.error('Error processing SOS request:', error);
-        res.status(500).json({ error: 'Internal server error processing SOS' });
-    }
-});
-
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+        // Start the server
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        });
